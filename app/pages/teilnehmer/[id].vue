@@ -15,6 +15,10 @@ useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 const participant = computed(() => response.value?.payload ?? null)
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
+const twitchChannelUrl = computed(() =>
+  participant.value?.twitchLogin ? `https://twitch.tv/${participant.value.twitchLogin}` : null
+)
+
 const generalStatistics = computed(() =>
   (participant.value?.statistics ?? []).filter(statistic => statistic.group === 'allgemein')
 )
@@ -43,32 +47,26 @@ const statisticTableColumns: TableColumn<ParticipantStatisticRowDto>[] = [
     v-if="participant"
     class="py-10 space-y-8"
   >
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div class="flex flex-wrap items-center gap-3">
-        <h1 class="text-2xl font-semibold">
-          {{ participant.displayName }}
-        </h1>
-        <RankBadge :rank="participant.rank" />
-        <TwitchLiveBadge v-if="participant.isLiveOnTwitch" />
-        <MinecraftOnlineBadge v-if="participant.isOnlineOnMinecraftServer" />
-        <UButton
-          v-if="participant.twitchLogin"
-          :to="`https://twitch.tv/${participant.twitchLogin}`"
-          target="_blank"
-          icon="i-simple-icons-twitch"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-        >
-          Twitch-Kanal
-        </UButton>
+    <div class="flex flex-wrap items-stretch gap-6">
+      <div class="w-64">
+        <ParticipantCard :participant="participant" />
       </div>
-      <DataFreshnessNote :as-of="dataAsOf" />
-    </div>
 
-    <p class="text-muted">
-      Gesamtpunktzahl: {{ Math.round(participant.totalScore) }}
-    </p>
+      <div class="flex flex-1 flex-col items-end justify-between">
+        <UButton
+          v-if="twitchChannelUrl"
+          :to="twitchChannelUrl"
+          target="_blank"
+          trailing-icon="i-lucide-arrow-up-right"
+          size="sm"
+          :color="participant.isLiveOnTwitch ? 'error' : 'neutral'"
+          :variant="participant.isLiveOnTwitch ? 'solid' : 'subtle'"
+        >
+          {{ participant.isLiveOnTwitch ? 'Live auf Twitch' : 'zu Twitch' }}
+        </UButton>
+        <DataFreshnessNote :as-of="dataAsOf" />
+      </div>
+    </div>
 
     <section class="space-y-3">
       <h2 class="text-lg font-medium">

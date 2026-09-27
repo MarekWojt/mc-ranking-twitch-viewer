@@ -1,9 +1,0 @@
-<template>
-  <UBadge
-    color="error"
-    variant="solid"
-    icon="i-simple-icons-twitch"
-  >
-    Live
-  </UBadge>
-</template>

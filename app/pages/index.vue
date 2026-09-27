@@ -33,8 +33,8 @@ const participantGroupSections = computed(() => [
         {{ section.title }}
       </h2>
 
-      <div class="space-y-2">
-        <ParticipantListItem
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(min(200px,100%),1fr))] gap-4">
+        <ParticipantCard
           v-for="participant in section.participants"
           :key="participant.id"
           :participant="participant"

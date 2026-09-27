@@ -18,42 +18,16 @@ interface TwitchGetStreamsResponse {
   data: TwitchGetStreamsResponseEntry[]
 }
 
-const twitchHelixUserLoginBatchSize = 100
-
-function splitIntoBatches<T>(items: T[], batchSize: number): T[][] {
-  const batches: T[][] = []
-  for (let startIndex = 0; startIndex < items.length; startIndex += batchSize) {
-    batches.push(items.slice(startIndex, startIndex + batchSize))
-  }
-  return batches
-}
-
-async function fetchLiveStreamsBatch(twitchLogins: string[], accessToken: string): Promise<TwitchGetStreamsResponseEntry[]> {
+async function fetchLiveStreamsBatch(twitchLogins: string[]): Promise<TwitchGetStreamsResponseEntry[]> {
   const { twitchClientId } = useRuntimeConfig()
-  const response = await $fetch<TwitchGetStreamsResponse>('https://api.twitch.tv/helix/streams', {
+  const response = await fetchTwitchHelixWithTokenRetry(accessToken => $fetch<TwitchGetStreamsResponse>('https://api.twitch.tv/helix/streams', {
     query: { user_login: twitchLogins },
     headers: {
       'Client-Id': twitchClientId,
       'Authorization': `Bearer ${accessToken}`
     }
-  })
+  }))
   return response.data
-}
-
-function isUnauthorizedFetchError(error: unknown): boolean {
-  return (error as { response?: { status?: number }, statusCode?: number })?.response?.status === 401
-    || (error as { statusCode?: number })?.statusCode === 401
-}
-
-async function fetchLiveStreamsBatchWithTokenRetry(twitchLogins: string[]): Promise<TwitchGetStreamsResponseEntry[]> {
-  const cachedAccessToken = await getTwitchAppAccessToken()
-  try {
-    return await fetchLiveStreamsBatch(twitchLogins, cachedAccessToken)
-  } catch (error) {
-    if (!isUnauthorizedFetchError(error)) throw error
-    const freshAccessToken = await fetchFreshTwitchAppAccessToken()
-    return await fetchLiveStreamsBatch(twitchLogins, freshAccessToken)
-  }
 }
 
 const twitchLiveStatusCacheTtlSeconds = useRuntimeConfig().twitchLiveStatusCacheTtlSeconds
@@ -68,8 +42,8 @@ export const getLiveTwitchStreamsByLogin = defineCachedFunction(async (): Promis
   if (twitchLogins.length === 0) return { value: {}, fetchedAt: new Date().toISOString() }
 
   try {
-    const batches = splitIntoBatches(twitchLogins, twitchHelixUserLoginBatchSize)
-    const batchResults = await Promise.all(batches.map(fetchLiveStreamsBatchWithTokenRetry))
+    const batches = splitIntoBatches(twitchLogins, TWITCH_HELIX_LOGIN_BATCH_SIZE)
+    const batchResults = await Promise.all(batches.map(fetchLiveStreamsBatch))
 
     const liveStreamsByTwitchLogin = Object.fromEntries(batchResults.flat().map(entry => [
       entry.user_login.toLowerCase(),

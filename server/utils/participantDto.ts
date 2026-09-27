@@ -2,11 +2,13 @@ export function toParticipantListItemDto(scoredParticipant: ScoredParticipant): 
   return {
     id: scoredParticipant.participant.id,
     displayName: scoredParticipant.participant.displayName,
+    minecraftUuid: scoredParticipant.participant.minecraftUuid,
     rank: scoredParticipant.rank,
     totalScore: scoredParticipant.totalScore,
     isOnlineOnMinecraftServer: scoredParticipant.isOnlineOnMinecraftServer,
     twitchLogin: scoredParticipant.participant.twitchLogin,
-    isLiveOnTwitch: scoredParticipant.isLiveOnTwitch
+    isLiveOnTwitch: scoredParticipant.isLiveOnTwitch,
+    twitchProfileImageUrl: scoredParticipant.twitchProfileImageUrl
   }
 }
 

@@ -11,6 +11,7 @@ export interface ScoredParticipant {
   isOnlineOnMinecraftServer: boolean
   isLiveOnTwitch: boolean
   twitchStreamTitle: string | null
+  twitchProfileImageUrl: string | null
   statistics: ParticipantStatisticScore[]
 }
 
@@ -25,22 +26,25 @@ function toOldestFetchedAt(fetchedAtTimestamps: string[]): string {
 }
 
 export async function computeScoreboard(): Promise<Scoreboard> {
-  const [participantsResult, statsResult, onlineStatusResult, liveStreamsResult] = await Promise.all([
+  const [participantsResult, statsResult, onlineStatusResult, liveStreamsResult, profileImageUrlsResult] = await Promise.all([
     loadParticipants(),
     loadAllPlayerStats(),
     getOnlinePlayerUuids(),
-    getLiveTwitchStreamsByLogin()
+    getLiveTwitchStreamsByLogin(),
+    getTwitchProfileImageUrlsByLogin()
   ])
 
   const participants = participantsResult.value
   const statsByMinecraftUuid = statsResult.value
   const onlinePlayerUuids = onlineStatusResult.value
   const liveStreamsByTwitchLogin = liveStreamsResult.value
+  const profileImageUrlByTwitchLogin = profileImageUrlsResult.value
   const asOf = toOldestFetchedAt([
     participantsResult.fetchedAt,
     statsResult.fetchedAt,
     onlineStatusResult.fetchedAt,
-    liveStreamsResult.fetchedAt
+    liveStreamsResult.fetchedAt,
+    profileImageUrlsResult.fetchedAt
   ])
 
   const onlinePlayerUuidSet = new Set(onlinePlayerUuids)
@@ -91,6 +95,7 @@ export async function computeScoreboard(): Promise<Scoreboard> {
         isOnlineOnMinecraftServer: onlinePlayerUuidSet.has(participant.minecraftUuid),
         isLiveOnTwitch: liveStream !== undefined,
         twitchStreamTitle: liveStream?.title ?? null,
+        twitchProfileImageUrl: participant.twitchLogin !== null ? profileImageUrlByTwitchLogin[participant.twitchLogin] ?? null : null,
         statistics: (statisticScoresByParticipantId.get(participant.id) ?? []).sort((a, b) => b.points - a.points)
       }
     })

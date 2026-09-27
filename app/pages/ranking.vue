@@ -12,11 +12,8 @@ const podiumRanks = computed(() => {
   return distinctRanksAscending.slice(0, 3)
 })
 
-const podiumGroups = computed(() =>
-  podiumRanks.value.map(rank => ({
-    rank,
-    participants: participants.value.filter(participant => participant.rank === rank)
-  }))
+const podiumParticipants = computed(() =>
+  participants.value.filter(participant => podiumRanks.value.includes(participant.rank))
 )
 
 const remainingParticipants = computed(() =>
@@ -44,30 +41,12 @@ function openParticipantDetail(_event: Event, row: { original: ParticipantListIt
       <DataFreshnessNote :as-of="dataAsOf" />
     </div>
 
-    <div class="grid gap-4 sm:grid-cols-3">
-      <UCard
-        v-for="podiumGroup in podiumGroups"
-        :key="podiumGroup.rank"
-      >
-        <template #header>
-          <span class="text-lg font-semibold">#{{ podiumGroup.rank }}</span>
-        </template>
-
-        <ul class="space-y-2">
-          <li
-            v-for="participant in podiumGroup.participants"
-            :key="participant.id"
-          >
-            <NuxtLink
-              :to="`/teilnehmer/${participant.id}`"
-              class="font-medium hover:text-primary"
-            >
-              {{ participant.displayName }}
-            </NuxtLink>
-            <span class="text-muted"> · {{ Math.round(participant.totalScore) }} Punkte</span>
-          </li>
-        </ul>
-      </UCard>
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))] gap-4">
+      <ParticipantCard
+        v-for="participant in podiumParticipants"
+        :key="participant.id"
+        :participant="participant"
+      />
     </div>
 
     <UTable
@@ -80,7 +59,26 @@ function openParticipantDetail(_event: Event, row: { original: ParticipantListIt
       </template>
 
       <template #displayName-cell="{ row }">
-        <span class="font-medium">{{ row.original.displayName }}</span>
+        <div class="flex items-center gap-2">
+          <img
+            :src="buildMinecraftHeadRenderUrl(row.original.minecraftUuid)"
+            :alt="`Minecraft-Kopf von ${row.original.displayName}`"
+            class="size-8 rounded"
+            loading="lazy"
+          >
+          <img
+            v-if="row.original.twitchProfileImageUrl"
+            :src="row.original.twitchProfileImageUrl"
+            :alt="`Twitch-Profilbild von ${row.original.displayName}`"
+            class="size-5 shrink-0 rounded-full"
+          >
+          <UIcon
+            v-else-if="row.original.twitchLogin"
+            name="i-simple-icons-twitch"
+            class="size-4 shrink-0 text-muted"
+          />
+          <span class="font-medium">{{ row.original.displayName }}</span>
+        </div>
       </template>
 
       <template #totalScore-cell="{ row }">

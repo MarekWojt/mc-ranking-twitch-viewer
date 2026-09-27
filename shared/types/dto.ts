@@ -1,11 +1,13 @@
 export interface ParticipantListItemDto {
   id: string
   displayName: string
+  minecraftUuid: string
   rank: number
   totalScore: number
   isOnlineOnMinecraftServer: boolean
   twitchLogin: string | null
   isLiveOnTwitch: boolean
+  twitchProfileImageUrl: string | null
 }
 
 export interface ParticipantStatisticRowDto {
