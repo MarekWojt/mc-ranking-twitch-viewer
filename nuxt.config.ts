@@ -11,8 +11,19 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
-  routeRules: {
-    '/': { prerender: true }
+  runtimeConfig: {
+    twitchClientId: '',
+    twitchClientSecret: '',
+    minecraftStatsDirectoryPath: '',
+    minecraftOnlinePlayersFilePath: '',
+    twitchLiveStatusCacheTtlSeconds: 30,
+    minecraftOnlineStatusCacheTtlSeconds: 15,
+    minecraftStatsCacheTtlSeconds: 300,
+    public: {
+      serverName: 'Minecraft Server',
+      serverLogoUrl: '/favicon.ico',
+      serverFaviconUrl: '/favicon.ico'
+    }
   },
 
   compatibilityDate: '2026-06-30',

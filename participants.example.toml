@@ -1,0 +1,12 @@
+[[participants]]
+id = "steve"
+displayName = "Steve"
+minecraftUuid = "069a79f4-44e9-4726-a5be-fca90e38aaf5"
+twitchLogin = "steve_streams"
+
+[[participants]]
+displayName = "Alex"
+minecraftName = "Alex"
+# kein id -> wird aus twitchLogin generiert, kein twitchLogin -> aus displayName
+# kein minecraftUuid -> wird beim ersten Laden aus minecraftName ermittelt
+# beide werden danach automatisch in diese Datei zurückgeschrieben

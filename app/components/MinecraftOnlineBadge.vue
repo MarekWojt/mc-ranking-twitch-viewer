@@ -1,0 +1,9 @@
+<template>
+  <UBadge
+    color="success"
+    variant="subtle"
+    icon="i-lucide-server"
+  >
+    Online
+  </UBadge>
+</template>
