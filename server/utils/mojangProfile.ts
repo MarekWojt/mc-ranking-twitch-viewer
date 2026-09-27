@@ -9,3 +9,11 @@ export async function resolveMinecraftUuidFromName(minecraftName: string): Promi
   )
   return normalizeMinecraftUuid(profile.id)
 }
+
+export async function resolveMinecraftNameFromUuid(minecraftUuid: string): Promise<string> {
+  const undashedMinecraftUuid = minecraftUuid.replaceAll('-', '')
+  const profile = await $fetch<MojangProfileResponse>(
+    `https://sessionserver.mojang.com/session/minecraft/profile/${undashedMinecraftUuid}`
+  )
+  return profile.name
+}

@@ -50,7 +50,7 @@ async function writeParticipantsConfigFileFromScratch(entryResolutions: Particip
 }
 
 function describeParticipantConfigEntryForErrors(entry: ParticipantConfigEntry, entryIndex: number): string {
-  return entry.displayName ?? entry.minecraftName ?? entry.twitchLogin ?? `Eintrag Nr. ${entryIndex + 1}`
+  return entry.displayName ?? entry.minecraftName ?? entry.twitchLogin ?? entry.minecraftUuid ?? `Eintrag Nr. ${entryIndex + 1}`
 }
 
 async function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entryIndex: number): Promise<ParticipantConfigFieldCompletion & { entry: ResolvedParticipantConfigEntry }> {
@@ -58,10 +58,20 @@ async function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entr
   const wasIdDerived = !resolvedEntry.id
   const wasDisplayNameDerived = !resolvedEntry.displayName
   const wasMinecraftUuidDerived = !resolvedEntry.minecraftUuid
+  let wasMinecraftNameDerived = false
 
   if (wasDisplayNameDerived) {
     if (!resolvedEntry.minecraftName && !resolvedEntry.twitchLogin) {
-      throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: weder displayName noch minecraftName oder twitchLogin in participants.toml angegeben`)
+      if (!resolvedEntry.minecraftUuid) {
+        throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: weder displayName, minecraftName, twitchLogin noch minecraftUuid in participants.toml angegeben`)
+      }
+
+      try {
+        resolvedEntry.minecraftName = await resolveMinecraftNameFromUuid(resolvedEntry.minecraftUuid)
+      } catch (error) {
+        throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: minecraftName konnte nicht aus minecraftUuid "${resolvedEntry.minecraftUuid}" ermittelt werden`, { cause: error })
+      }
+      wasMinecraftNameDerived = true
     }
     resolvedEntry.displayName = resolvedEntry.twitchLogin ?? resolvedEntry.minecraftName
   }
@@ -82,7 +92,7 @@ async function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entr
     }
   }
 
-  return { entry: resolvedEntry as ResolvedParticipantConfigEntry, wasIdDerived, wasDisplayNameDerived, wasMinecraftUuidDerived }
+  return { entry: resolvedEntry as ResolvedParticipantConfigEntry, wasIdDerived, wasDisplayNameDerived, wasMinecraftUuidDerived, wasMinecraftNameDerived }
 }
 
 async function resolveParticipantConfigEntriesTolerantly(rawEntries: ParticipantConfigEntry[]): Promise<ParticipantConfigEntryResolution[]> {
@@ -102,6 +112,13 @@ async function resolveParticipantConfigEntriesTolerantly(rawEntries: Participant
   }
 
   return entryResolutions
+}
+
+async function discoverParticipantConfigEntriesFromStats(alreadyClaimedMinecraftUuids: Set<string>): Promise<ParticipantConfigEntryResolution[]> {
+  const statsDirectoryMinecraftUuids = await listMinecraftUuidsWithStatsFiles()
+  const undiscoveredMinecraftUuids = statsDirectoryMinecraftUuids.filter(minecraftUuid => !alreadyClaimedMinecraftUuids.has(minecraftUuid))
+
+  return resolveParticipantConfigEntriesTolerantly(undiscoveredMinecraftUuids.map(minecraftUuid => ({ minecraftUuid })))
 }
 
 function toValidatedParticipants(entries: ResolvedParticipantConfigEntry[]): Participant[] {
@@ -140,21 +157,32 @@ export const loadParticipants = defineCachedFunction(async (): Promise<Timestamp
   const parsedFile = parseToml(fileContents) as unknown as ParticipantsTomlFile
   const rawEntries = parsedFile.participants ?? []
 
-  const entryResolutions = await resolveParticipantConfigEntriesTolerantly(rawEntries)
-  const successfulCompletions = entryResolutions
+  const configuredEntryResolutions = await resolveParticipantConfigEntriesTolerantly(rawEntries)
+  const configuredCompletions = configuredEntryResolutions
     .map(resolution => resolution.completion)
     .filter(completion => completion !== null)
 
-  const resolvedEntries = successfulCompletions.map(completion => completion.entry)
-  const needsWriteBack = successfulCompletions.some(completion =>
-    completion.wasIdDerived || completion.wasDisplayNameDerived || completion.wasMinecraftUuidDerived
+  const claimedMinecraftUuids = new Set(configuredCompletions.map(completion => completion.entry.minecraftUuid))
+  const discoveredEntryResolutions = await discoverParticipantConfigEntriesFromStats(claimedMinecraftUuids)
+  const discoveredCompletions = discoveredEntryResolutions
+    .map(resolution => resolution.completion)
+    .filter(completion => completion !== null)
+
+  const resolvedEntries = [...configuredCompletions, ...discoveredCompletions].map(completion => completion.entry)
+
+  const needsExistingEntriesWriteBack = configuredCompletions.some(completion =>
+    completion.wasIdDerived || completion.wasDisplayNameDerived || completion.wasMinecraftUuidDerived || completion.wasMinecraftNameDerived
   )
 
-  if (needsWriteBack) {
-    const fieldCompletionsByPosition = entryResolutions.map(resolution => resolution.completion)
-    const patchedFileContents = patchMissingParticipantFieldsIntoFileContents(fileContents, fieldCompletionsByPosition)
+  if (needsExistingEntriesWriteBack || discoveredCompletions.length > 0) {
+    const fieldCompletionsByPosition = configuredEntryResolutions.map(resolution => resolution.completion)
+    const newEntriesTomlText = discoveredCompletions.length > 0
+      ? stringifyToml({ participants: discoveredCompletions.map(completion => toOrderedTomlEntry(completion.entry)) })
+      : null
+
+    const patchedFileContents = patchMissingParticipantFieldsIntoFileContents(fileContents, fieldCompletionsByPosition, newEntriesTomlText)
     if (patchedFileContents === null) {
-      await writeParticipantsConfigFileFromScratch(entryResolutions)
+      await writeParticipantsConfigFileFromScratch([...configuredEntryResolutions, ...discoveredEntryResolutions])
     } else {
       await writeFile(participantsConfigFilePath, patchedFileContents, 'utf8')
     }

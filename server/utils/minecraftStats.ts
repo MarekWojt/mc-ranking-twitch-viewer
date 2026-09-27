@@ -1,5 +1,22 @@
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+
+const STATS_FILENAME_MINECRAFT_UUID_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.json$/i
+
+export async function listMinecraftUuidsWithStatsFiles(): Promise<string[]> {
+  const { minecraftStatsDirectoryPath } = useRuntimeConfig()
+
+  try {
+    const filenames = await readdir(minecraftStatsDirectoryPath)
+    return filenames
+      .map(filename => filename.match(STATS_FILENAME_MINECRAFT_UUID_PATTERN)?.[1])
+      .filter((minecraftUuid): minecraftUuid is string => minecraftUuid !== undefined)
+      .map(normalizeMinecraftUuid)
+  } catch (error) {
+    console.error('Stats-Verzeichnis konnte nicht nach neuen Teilnehmern durchsucht werden:', error)
+    return []
+  }
+}
 
 export type RawStatisticValuesByKey = Record<string, number>
 export type RawStatisticsByCategory = Record<string, RawStatisticValuesByKey>

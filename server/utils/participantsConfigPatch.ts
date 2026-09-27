@@ -1,8 +1,9 @@
 export interface ParticipantConfigFieldCompletion {
-  entry: { id: string, displayName: string, minecraftUuid: string }
+  entry: { id: string, displayName: string, minecraftUuid: string, minecraftName?: string }
   wasIdDerived: boolean
   wasDisplayNameDerived: boolean
   wasMinecraftUuidDerived: boolean
+  wasMinecraftNameDerived: boolean
 }
 
 const PARTICIPANT_TABLE_HEADER_PATTERN = /^\s*\[\[\s*participants\s*\]\]\s*(#.*)?$/
@@ -20,7 +21,8 @@ function toTomlStringLiteral(value: string): string {
 
 export function patchMissingParticipantFieldsIntoFileContents(
   originalFileContents: string,
-  fieldCompletions: (ParticipantConfigFieldCompletion | null)[]
+  fieldCompletions: (ParticipantConfigFieldCompletion | null)[],
+  newEntriesTomlText: string | null
 ): string | null {
   const fileLines = originalFileContents.split('\n')
   const tableHeaderLineIndexes = findParticipantTableHeaderLineIndexes(fileLines)
@@ -46,10 +48,18 @@ export function patchMissingParticipantFieldsIntoFileContents(
     if (fieldCompletion.wasMinecraftUuidDerived) {
       derivedFieldLines.push(`minecraftUuid = ${toTomlStringLiteral(fieldCompletion.entry.minecraftUuid)}`)
     }
+    if (fieldCompletion.wasMinecraftNameDerived && fieldCompletion.entry.minecraftName) {
+      derivedFieldLines.push(`minecraftName = ${toTomlStringLiteral(fieldCompletion.entry.minecraftName)}`)
+    }
     if (derivedFieldLines.length === 0) continue
 
     fileLines.splice(headerLineIndex + 1, 0, ...derivedFieldLines)
   }
 
-  return fileLines.join('\n')
+  if (newEntriesTomlText === null) return fileLines.join('\n')
+
+  const lastLine = fileLines.at(-1)
+  if (lastLine !== undefined && lastLine.trim().length > 0) fileLines.push('')
+
+  return `${fileLines.join('\n')}\n${newEntriesTomlText}`
 }
