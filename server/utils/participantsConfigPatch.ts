@@ -20,7 +20,7 @@ function toTomlStringLiteral(value: string): string {
 
 export function patchMissingParticipantFieldsIntoFileContents(
   originalFileContents: string,
-  fieldCompletions: ParticipantConfigFieldCompletion[]
+  fieldCompletions: (ParticipantConfigFieldCompletion | null)[]
 ): string | null {
   const fileLines = originalFileContents.split('\n')
   const tableHeaderLineIndexes = findParticipantTableHeaderLineIndexes(fileLines)
@@ -30,7 +30,7 @@ export function patchMissingParticipantFieldsIntoFileContents(
   const tablePatches: { headerLineIndex: number, fieldCompletion: ParticipantConfigFieldCompletion }[] = []
   tableHeaderLineIndexes.forEach((headerLineIndex, tableIndex) => {
     const fieldCompletion = fieldCompletions[tableIndex]
-    if (fieldCompletion === undefined) return
+    if (fieldCompletion === undefined || fieldCompletion === null) return
     tablePatches.push({ headerLineIndex, fieldCompletion })
   })
 

@@ -25,6 +25,11 @@ async function readParticipantsConfigFile(): Promise<string> {
   }
 }
 
+interface ParticipantConfigEntryResolution {
+  rawEntry: ParticipantConfigEntry
+  completion: (ParticipantConfigFieldCompletion & { entry: ResolvedParticipantConfigEntry }) | null
+}
+
 function toOrderedTomlEntry(entry: ResolvedParticipantConfigEntry): ParticipantConfigEntry {
   const tomlEntry: ParticipantConfigEntry = {
     id: entry.id,
@@ -36,8 +41,11 @@ function toOrderedTomlEntry(entry: ResolvedParticipantConfigEntry): ParticipantC
   return tomlEntry
 }
 
-async function writeParticipantsConfigFileFromScratch(entries: ResolvedParticipantConfigEntry[]): Promise<void> {
-  const tomlContents = stringifyToml({ participants: entries.map(toOrderedTomlEntry) })
+async function writeParticipantsConfigFileFromScratch(entryResolutions: ParticipantConfigEntryResolution[]): Promise<void> {
+  const tomlEntries = entryResolutions.map(({ rawEntry, completion }) =>
+    completion ? toOrderedTomlEntry(completion.entry) : rawEntry
+  )
+  const tomlContents = stringifyToml({ participants: tomlEntries })
   await writeFile(participantsConfigFilePath, tomlContents, 'utf8')
 }
 
@@ -77,6 +85,25 @@ async function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entr
   return { entry: resolvedEntry as ResolvedParticipantConfigEntry, wasIdDerived, wasDisplayNameDerived, wasMinecraftUuidDerived }
 }
 
+async function resolveParticipantConfigEntriesTolerantly(rawEntries: ParticipantConfigEntry[]): Promise<ParticipantConfigEntryResolution[]> {
+  const entryResolutions: ParticipantConfigEntryResolution[] = []
+
+  for (const [entryIndex, rawEntry] of rawEntries.entries()) {
+    try {
+      const completion = await resolveParticipantConfigEntry(rawEntry, entryIndex)
+      entryResolutions.push({ rawEntry, completion })
+    } catch (error) {
+      console.error(
+        `Teilnehmer-Eintrag konnte nicht aufgelöst werden und wird vorerst übersprungen: ${describeParticipantConfigEntryForErrors(rawEntry, entryIndex)}`,
+        error
+      )
+      entryResolutions.push({ rawEntry, completion: null })
+    }
+  }
+
+  return entryResolutions
+}
+
 function toValidatedParticipants(entries: ResolvedParticipantConfigEntry[]): Participant[] {
   const seenParticipantIds = new Set<string>()
   const seenMinecraftUuids = new Set<string>()
@@ -113,16 +140,21 @@ export const loadParticipants = defineCachedFunction(async (): Promise<Timestamp
   const parsedFile = parseToml(fileContents) as unknown as ParticipantsTomlFile
   const rawEntries = parsedFile.participants ?? []
 
-  const resolutions = await Promise.all(rawEntries.map(resolveParticipantConfigEntry))
-  const resolvedEntries = resolutions.map(resolution => resolution.entry)
-  const needsWriteBack = resolutions.some(resolution =>
-    resolution.wasIdDerived || resolution.wasDisplayNameDerived || resolution.wasMinecraftUuidDerived
+  const entryResolutions = await resolveParticipantConfigEntriesTolerantly(rawEntries)
+  const successfulCompletions = entryResolutions
+    .map(resolution => resolution.completion)
+    .filter(completion => completion !== null)
+
+  const resolvedEntries = successfulCompletions.map(completion => completion.entry)
+  const needsWriteBack = successfulCompletions.some(completion =>
+    completion.wasIdDerived || completion.wasDisplayNameDerived || completion.wasMinecraftUuidDerived
   )
 
   if (needsWriteBack) {
-    const patchedFileContents = patchMissingParticipantFieldsIntoFileContents(fileContents, resolutions)
+    const fieldCompletionsByPosition = entryResolutions.map(resolution => resolution.completion)
+    const patchedFileContents = patchMissingParticipantFieldsIntoFileContents(fileContents, fieldCompletionsByPosition)
     if (patchedFileContents === null) {
-      await writeParticipantsConfigFileFromScratch(resolvedEntries)
+      await writeParticipantsConfigFileFromScratch(entryResolutions)
     } else {
       await writeFile(participantsConfigFilePath, patchedFileContents, 'utf8')
     }
