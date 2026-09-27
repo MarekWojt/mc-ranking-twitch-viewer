@@ -63,11 +63,11 @@ export async function computeScoreboard(): Promise<Scoreboard> {
       statsByMinecraftUuid[participant.minecraftUuid]?.[statisticDefinition.category]?.[statisticDefinition.key] ?? 0
     ]))
 
-    const maxValue = Math.max(...valueByParticipantId.values())
+    const medianValue = calculateMedian([...valueByParticipantId.values()].filter(value => value >= 1))
 
     for (const participant of participants) {
       const value = valueByParticipantId.get(participant.id) ?? 0
-      const points = maxValue === 0 ? 0 : (value / maxValue) * 100
+      const points = calculateStatisticPoints(value, medianValue)
 
       statisticScoresByParticipantId.get(participant.id)?.push({ statistic: statisticDefinition, value, points })
       totalScoreByParticipantId.set(participant.id, (totalScoreByParticipantId.get(participant.id) ?? 0) + points)
