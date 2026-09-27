@@ -15,16 +15,32 @@ export interface ScoredParticipant {
 }
 
 export interface Scoreboard {
+  asOf: string
   statisticDefinitions: StatisticDefinition[]
   participants: ScoredParticipant[]
 }
 
+function toOldestFetchedAt(fetchedAtTimestamps: string[]): string {
+  return [...fetchedAtTimestamps].sort()[0]!
+}
+
 export async function computeScoreboard(): Promise<Scoreboard> {
-  const [participants, statsByMinecraftUuid, onlinePlayerUuids, liveStreamsByTwitchLogin] = await Promise.all([
+  const [participantsResult, statsResult, onlineStatusResult, liveStreamsResult] = await Promise.all([
     loadParticipants(),
     loadAllPlayerStats(),
     getOnlinePlayerUuids(),
     getLiveTwitchStreamsByLogin()
+  ])
+
+  const participants = participantsResult.value
+  const statsByMinecraftUuid = statsResult.value
+  const onlinePlayerUuids = onlineStatusResult.value
+  const liveStreamsByTwitchLogin = liveStreamsResult.value
+  const asOf = toOldestFetchedAt([
+    participantsResult.fetchedAt,
+    statsResult.fetchedAt,
+    onlineStatusResult.fetchedAt,
+    liveStreamsResult.fetchedAt
   ])
 
   const onlinePlayerUuidSet = new Set(onlinePlayerUuids)
@@ -63,6 +79,7 @@ export async function computeScoreboard(): Promise<Scoreboard> {
   )
 
   return {
+    asOf,
     statisticDefinitions,
     participants: rankedParticipants.map(({ participant, totalScore, rank }) => {
       const liveStream = participant.twitchLogin !== null ? liveStreamsByTwitchLogin[participant.twitchLogin] : undefined

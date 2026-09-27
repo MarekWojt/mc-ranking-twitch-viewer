@@ -58,20 +58,20 @@ async function fetchLiveStreamsBatchWithTokenRetry(twitchLogins: string[]): Prom
 
 const twitchLiveStatusCacheTtlSeconds = useRuntimeConfig().twitchLiveStatusCacheTtlSeconds
 
-export const getLiveTwitchStreamsByLogin = defineCachedFunction(async (): Promise<Record<string, TwitchLiveStream>> => {
-  const participants = await loadParticipants()
+export const getLiveTwitchStreamsByLogin = defineCachedFunction(async (): Promise<TimestampedValue<Record<string, TwitchLiveStream>>> => {
+  const { value: participants } = await loadParticipants()
   const twitchLogins = [...new Set(
     participants
       .map(participant => participant.twitchLogin)
       .filter((twitchLogin): twitchLogin is string => twitchLogin !== null)
   )]
-  if (twitchLogins.length === 0) return {}
+  if (twitchLogins.length === 0) return { value: {}, fetchedAt: new Date().toISOString() }
 
   try {
     const batches = splitIntoBatches(twitchLogins, twitchHelixUserLoginBatchSize)
     const batchResults = await Promise.all(batches.map(fetchLiveStreamsBatchWithTokenRetry))
 
-    return Object.fromEntries(batchResults.flat().map(entry => [
+    const liveStreamsByTwitchLogin = Object.fromEntries(batchResults.flat().map(entry => [
       entry.user_login.toLowerCase(),
       {
         userLogin: entry.user_login,
@@ -81,9 +81,10 @@ export const getLiveTwitchStreamsByLogin = defineCachedFunction(async (): Promis
         startedAt: entry.started_at
       } satisfies TwitchLiveStream
     ]))
+    return { value: liveStreamsByTwitchLogin, fetchedAt: new Date().toISOString() }
   } catch (error) {
     console.error('Twitch-Live-Status konnte nicht abgerufen werden, alle Teilnehmer gelten als nicht live:', error)
-    return {}
+    return { value: {}, fetchedAt: new Date().toISOString() }
   }
 }, {
   name: 'twitch-live-streams',

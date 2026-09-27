@@ -108,7 +108,7 @@ function toValidatedParticipants(entries: ResolvedParticipantConfigEntry[]): Par
 
 const participantsConfigCacheTtlSeconds = 60
 
-export const loadParticipants = defineCachedFunction(async (): Promise<Participant[]> => {
+export const loadParticipants = defineCachedFunction(async (): Promise<TimestampedValue<Participant[]>> => {
   const fileContents = await readParticipantsConfigFile()
   const parsedFile = parseToml(fileContents) as unknown as ParticipantsTomlFile
   const rawEntries = parsedFile.participants ?? []
@@ -128,7 +128,7 @@ export const loadParticipants = defineCachedFunction(async (): Promise<Participa
     }
   }
 
-  return toValidatedParticipants(resolvedEntries)
+  return { value: toValidatedParticipants(resolvedEntries), fetchedAt: new Date().toISOString() }
 }, {
   name: 'participants-config',
   getKey: () => 'all',

@@ -1,22 +1,26 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
-const { data: participants } = await useFetch<ParticipantListItemDto[]>('/api/participants')
+const { data: response, refresh } = await useFetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants')
+useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
+
+const participants = computed(() => response.value?.payload ?? [])
+const dataAsOf = computed(() => response.value?.asOf ?? null)
 
 const podiumRanks = computed(() => {
-  const distinctRanksAscending = [...new Set((participants.value ?? []).map(participant => participant.rank))].sort((a, b) => a - b)
+  const distinctRanksAscending = [...new Set(participants.value.map(participant => participant.rank))].sort((a, b) => a - b)
   return distinctRanksAscending.slice(0, 3)
 })
 
 const podiumGroups = computed(() =>
   podiumRanks.value.map(rank => ({
     rank,
-    participants: (participants.value ?? []).filter(participant => participant.rank === rank)
+    participants: participants.value.filter(participant => participant.rank === rank)
   }))
 )
 
 const remainingParticipants = computed(() =>
-  (participants.value ?? []).filter(participant => !podiumRanks.value.includes(participant.rank))
+  participants.value.filter(participant => !podiumRanks.value.includes(participant.rank))
 )
 
 const rankingTableColumns: TableColumn<ParticipantListItemDto>[] = [
@@ -33,9 +37,12 @@ function openParticipantDetail(_event: Event, row: { original: ParticipantListIt
 
 <template>
   <UContainer class="py-10 space-y-10">
-    <h1 class="text-2xl font-semibold">
-      Rangliste
-    </h1>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-2xl font-semibold">
+        Rangliste
+      </h1>
+      <DataFreshnessNote :as-of="dataAsOf" />
+    </div>
 
     <div class="grid gap-4 sm:grid-cols-3">
       <UCard

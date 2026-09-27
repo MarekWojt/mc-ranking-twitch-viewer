@@ -1,7 +1,11 @@
 <script setup lang="ts">
-const { data: participants } = await useFetch<ParticipantListItemDto[]>('/api/participants')
+const { data: response, refresh } = await useFetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants')
+useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 
-const groupedParticipants = computed(() => groupParticipantsForHomepage(participants.value ?? []))
+const participants = computed(() => response.value?.payload ?? [])
+const dataAsOf = computed(() => response.value?.asOf ?? null)
+
+const groupedParticipants = computed(() => groupParticipantsForHomepage(participants.value))
 
 const participantGroupSections = computed(() => [
   { title: 'Online & Live', participants: groupedParticipants.value.onlineAndLive },
@@ -13,9 +17,12 @@ const participantGroupSections = computed(() => [
 
 <template>
   <UContainer class="py-10 space-y-8">
-    <h1 class="text-2xl font-semibold">
-      Teilnehmer
-    </h1>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-2xl font-semibold">
+        Teilnehmer
+      </h1>
+      <DataFreshnessNote :as-of="dataAsOf" />
+    </div>
 
     <section
       v-for="section in participantGroupSections"

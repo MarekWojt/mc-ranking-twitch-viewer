@@ -1,4 +1,4 @@
-export default defineEventHandler(async (event): Promise<StatisticDetailDto> => {
+export default defineEventHandler(async (event): Promise<DataWithFreshness<StatisticDetailDto>> => {
   const slug = getRouterParam(event, 'slug')
   const scoreboard = await computeScoreboard()
   const statisticDefinition = scoreboard.statisticDefinitions.find(definition => definition.slug === slug)
@@ -22,10 +22,13 @@ export default defineEventHandler(async (event): Promise<StatisticDetailDto> => 
     .sort((a, b) => b.points - a.points)
 
   return {
-    slug: statisticDefinition.slug,
-    label: statisticDefinition.label,
-    group: statisticDefinition.group,
-    groupLabel: statisticDefinition.groupLabel,
-    participants: participantRows
+    asOf: scoreboard.asOf,
+    payload: {
+      slug: statisticDefinition.slug,
+      label: statisticDefinition.label,
+      group: statisticDefinition.group,
+      groupLabel: statisticDefinition.groupLabel,
+      participants: participantRows
+    }
   }
 })

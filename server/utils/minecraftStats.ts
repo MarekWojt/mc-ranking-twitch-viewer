@@ -25,14 +25,14 @@ async function readPlayerStats(minecraftUuid: string): Promise<RawStatisticsByCa
 
 const minecraftStatsCacheTtlSeconds = useRuntimeConfig().minecraftStatsCacheTtlSeconds
 
-export const loadAllPlayerStats = defineCachedFunction(async (): Promise<Record<string, RawStatisticsByCategory>> => {
-  const participants = await loadParticipants()
+export const loadAllPlayerStats = defineCachedFunction(async (): Promise<TimestampedValue<Record<string, RawStatisticsByCategory>>> => {
+  const { value: participants } = await loadParticipants()
   const statsEntries = await Promise.all(
     participants.map(async participant =>
       [participant.minecraftUuid, await readPlayerStats(participant.minecraftUuid)] as const
     )
   )
-  return Object.fromEntries(statsEntries)
+  return { value: Object.fromEntries(statsEntries), fetchedAt: new Date().toISOString() }
 }, {
   name: 'minecraft-player-stats',
   getKey: () => 'all',

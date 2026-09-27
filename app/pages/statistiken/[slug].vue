@@ -4,11 +4,16 @@ import type { TableColumn } from '@nuxt/ui'
 const route = useRoute()
 const statisticSlug = route.params.slug as string
 
-const { data: statistic } = await useFetch<StatisticDetailDto>(`/api/statistics/${statisticSlug}`)
+const { data: response, refresh } = await useFetch<DataWithFreshness<StatisticDetailDto>>(`/api/statistics/${statisticSlug}`)
 
-if (!statistic.value) {
+if (!response.value) {
   throw createError({ statusCode: 404, statusMessage: 'Statistik nicht gefunden' })
 }
+
+useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
+
+const statistic = computed(() => response.value?.payload ?? null)
+const dataAsOf = computed(() => response.value?.asOf ?? null)
 
 const statisticParticipantTableColumns: TableColumn<StatisticParticipantRowDto>[] = [
   { accessorKey: 'displayName', header: 'Teilnehmer' },
@@ -26,9 +31,12 @@ function openParticipantDetail(_event: Event, row: { original: StatisticParticip
     v-if="statistic"
     class="py-10 space-y-6"
   >
-    <h1 class="text-2xl font-semibold">
-      <span v-if="statistic.groupLabel">{{ statistic.groupLabel }}: </span>{{ statistic.label }}
-    </h1>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-2xl font-semibold">
+        <span v-if="statistic.groupLabel">{{ statistic.groupLabel }}: </span>{{ statistic.label }}
+      </h1>
+      <DataFreshnessNote :as-of="dataAsOf" />
+    </div>
 
     <UTable
       :data="statistic.participants"

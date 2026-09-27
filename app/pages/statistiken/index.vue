@@ -1,14 +1,17 @@
 <script setup lang="ts">
-const { data: statistics } = await useFetch<StatisticListItemDto[]>('/api/statistics')
+const { data: response, refresh } = await useFetch<DataWithFreshness<StatisticListItemDto[]>>('/api/statistics')
+useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
+
+const statistics = computed(() => response.value?.payload ?? [])
+const dataAsOf = computed(() => response.value?.asOf ?? null)
 
 const statisticsSearchQuery = ref('')
 
 const filteredStatistics = computed(() => {
   const searchQuery = statisticsSearchQuery.value.trim().toLowerCase()
-  const allStatistics = statistics.value ?? []
-  if (searchQuery.length === 0) return allStatistics
+  if (searchQuery.length === 0) return statistics.value
 
-  return allStatistics.filter(statistic =>
+  return statistics.value.filter(statistic =>
     `${statistic.groupLabel} ${statistic.label}`.toLowerCase().includes(searchQuery)
   )
 })
@@ -37,11 +40,14 @@ const specificStatisticsByGroupLabel = computed(() => {
       <h1 class="text-2xl font-semibold">
         Statistiken
       </h1>
-      <UInput
-        v-model="statisticsSearchQuery"
-        icon="i-lucide-search"
-        placeholder="Statistik suchen…"
-      />
+      <div class="flex items-center gap-3">
+        <DataFreshnessNote :as-of="dataAsOf" />
+        <UInput
+          v-model="statisticsSearchQuery"
+          icon="i-lucide-search"
+          placeholder="Statistik suchen…"
+        />
+      </div>
     </div>
 
     <section class="space-y-3">
