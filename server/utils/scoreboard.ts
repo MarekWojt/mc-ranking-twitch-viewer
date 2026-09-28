@@ -8,6 +8,7 @@ export interface ScoredParticipant {
   participant: Participant
   totalScore: number
   rank: number
+  percentOfLeaderScore: number
   isOnlineOnMinecraftServer: boolean
   isLiveOnTwitch: boolean
   twitchStreamTitle: string | null
@@ -82,6 +83,8 @@ export async function computeScoreboard(): Promise<Scoreboard> {
     entry => entry.totalScore
   )
 
+  const leaderScore = rankedParticipants[0]?.totalScore ?? 0
+
   return {
     asOf,
     statisticDefinitions,
@@ -92,6 +95,7 @@ export async function computeScoreboard(): Promise<Scoreboard> {
         participant,
         totalScore,
         rank,
+        percentOfLeaderScore: leaderScore === 0 ? 0 : (totalScore / leaderScore) * 100,
         isOnlineOnMinecraftServer: onlinePlayerUuidSet.has(participant.minecraftUuid),
         isLiveOnTwitch: liveStream !== undefined,
         twitchStreamTitle: liveStream?.title ?? null,

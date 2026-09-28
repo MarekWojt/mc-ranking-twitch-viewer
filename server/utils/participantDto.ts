@@ -5,6 +5,7 @@ export function toParticipantListItemDto(scoredParticipant: ScoredParticipant): 
     minecraftUuid: scoredParticipant.participant.minecraftUuid,
     rank: scoredParticipant.rank,
     totalScore: scoredParticipant.totalScore,
+    percentOfLeaderScore: scoredParticipant.percentOfLeaderScore,
     isOnlineOnMinecraftServer: scoredParticipant.isOnlineOnMinecraftServer,
     twitchLogin: scoredParticipant.participant.twitchLogin,
     isLiveOnTwitch: scoredParticipant.isLiveOnTwitch,

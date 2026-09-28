@@ -4,6 +4,7 @@ export interface ParticipantListItemDto {
   minecraftUuid: string
   rank: number
   totalScore: number
+  percentOfLeaderScore: number
   isOnlineOnMinecraftServer: boolean
   twitchLogin: string | null
   isLiveOnTwitch: boolean

@@ -24,6 +24,7 @@ const rankingTableColumns: TableColumn<ParticipantListItemDto>[] = [
   { accessorKey: 'rank', header: 'Rang' },
   { accessorKey: 'displayName', header: 'Teilnehmer' },
   { accessorKey: 'totalScore', header: 'Punkte' },
+  { accessorKey: 'percentOfLeaderScore', header: '% von Platz 1' },
   { id: 'twitch', header: 'Twitch' }
 ]
 
@@ -46,6 +47,7 @@ function openParticipantDetail(_event: Event, row: { original: ParticipantListIt
         v-for="participant in podiumParticipants"
         :key="participant.id"
         :participant="participant"
+        show-percent-of-leader
       />
     </div>
 
@@ -83,6 +85,10 @@ function openParticipantDetail(_event: Event, row: { original: ParticipantListIt
 
       <template #totalScore-cell="{ row }">
         {{ Math.round(row.original.totalScore) }}
+      </template>
+
+      <template #percentOfLeaderScore-cell="{ row }">
+        {{ row.original.percentOfLeaderScore.toFixed(1) }}%
       </template>
 
       <template #twitch-cell="{ row }">

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const props = defineProps<{
   participant: ParticipantListItemDto
+  showPercentOfLeader?: boolean
 }>()
 
 const minecraftSkinRenderUrl = computed(() => buildMinecraftBodyRenderUrl(props.participant.minecraftUuid))
@@ -60,7 +61,7 @@ const formattedTotalScore = computed(() => Math.round(props.participant.totalSco
           name="i-simple-icons-twitch"
           class="size-7 shrink-0 text-muted"
         />
-        <div class="min-w-0">
+        <div class="min-w-0 flex-1">
           <p class="truncate text-lg font-semibold">
             {{ participant.displayName }}
           </p>
@@ -68,6 +69,16 @@ const formattedTotalScore = computed(() => Math.round(props.participant.totalSco
             {{ formattedTotalScore }} Punkte
           </p>
         </div>
+
+        <UTooltip
+          v-if="showPercentOfLeader"
+          text="von Platz 1"
+          class="shrink-0 self-end"
+        >
+          <p class="text-sm text-muted">
+            {{ participant.percentOfLeaderScore.toFixed(1) }}%
+          </p>
+        </UTooltip>
       </div>
     </UCard>
   </NuxtLink>
