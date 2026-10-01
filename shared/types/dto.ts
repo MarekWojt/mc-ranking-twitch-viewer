@@ -26,11 +26,21 @@ export interface ParticipantDetailDto extends ParticipantListItemDto {
   statistics: ParticipantStatisticRowDto[]
 }
 
+export interface StatisticLeaderDto {
+  participantId: string
+  displayName: string
+  minecraftUuid: string
+}
+
 export interface StatisticListItemDto {
   slug: string
+  key: string
   label: string
   group: StatisticGroup
   groupLabel: string | null
+  specificSubgroup: SpecificStatisticSubgroup | null
+  maxValue: number
+  leaders: StatisticLeaderDto[]
 }
 
 export interface StatisticParticipantRowDto {
@@ -47,4 +57,9 @@ export interface StatisticDetailDto {
   group: StatisticGroup
   groupLabel: string | null
   participants: StatisticParticipantRowDto[]
+}
+
+export interface MinecraftIconBundleDto {
+  itemIconsByBareId: Record<string, string>
+  entityIconsByBareId: Record<string, string>
 }

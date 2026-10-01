@@ -51,6 +51,10 @@ export async function computeScoreboard(): Promise<Scoreboard> {
   const onlinePlayerUuidSet = new Set(onlinePlayerUuids)
   const statisticDefinitions = collectStatisticDefinitions(statsByMinecraftUuid)
 
+  buildMinecraftIconBundle(statisticDefinitions).catch((error) => {
+    console.error('Vorab-Laden der Minecraft-Icons im Hintergrund fehlgeschlagen:', error)
+  })
+
   const statisticScoresByParticipantId = new Map<string, ParticipantStatisticScore[]>(
     participants.map(participant => [participant.id, []])
   )

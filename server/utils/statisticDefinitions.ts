@@ -1,5 +1,25 @@
 export const GENERAL_STATISTIC_CATEGORY = 'minecraft:custom'
 
+const ITEM_RELATED_STATISTIC_CATEGORIES = new Set([
+  'minecraft:mined',
+  'minecraft:broken',
+  'minecraft:crafted',
+  'minecraft:used',
+  'minecraft:picked_up',
+  'minecraft:dropped'
+])
+
+const ENTITY_RELATED_STATISTIC_CATEGORIES = new Set([
+  'minecraft:killed',
+  'minecraft:killed_by'
+])
+
+function classifySpecificStatisticSubgroup(category: string): SpecificStatisticSubgroup | null {
+  if (ITEM_RELATED_STATISTIC_CATEGORIES.has(category)) return 'items'
+  if (ENTITY_RELATED_STATISTIC_CATEGORIES.has(category)) return 'entities'
+  return null
+}
+
 export function buildStatisticDefinition(category: string, key: string): StatisticDefinition {
   const isGeneralStatistic = category === GENERAL_STATISTIC_CATEGORY
 
@@ -9,6 +29,7 @@ export function buildStatisticDefinition(category: string, key: string): Statist
     key,
     group: isGeneralStatistic ? 'allgemein' : 'spezifisch',
     groupLabel: isGeneralStatistic ? null : humanizeMinecraftId(category),
+    specificSubgroup: isGeneralStatistic ? null : classifySpecificStatisticSubgroup(category),
     label: humanizeMinecraftId(key)
   }
 }
