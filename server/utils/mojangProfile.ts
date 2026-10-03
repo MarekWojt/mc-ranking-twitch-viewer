@@ -10,10 +10,18 @@ export async function resolveMinecraftUuidFromName(minecraftName: string): Promi
   return normalizeMinecraftUuid(profile.id)
 }
 
-export async function resolveMinecraftNameFromUuid(minecraftUuid: string): Promise<string> {
+async function fetchMinecraftNameFromUuid(minecraftUuid: string): Promise<string> {
   const undashedMinecraftUuid = minecraftUuid.replaceAll('-', '')
   const profile = await $fetch<MojangProfileResponse>(
     `https://sessionserver.mojang.com/session/minecraft/profile/${undashedMinecraftUuid}`
   )
   return profile.name
 }
+
+const minecraftNameFromUuidCacheTtlSeconds = 60 * 60 * 24
+
+export const resolveMinecraftNameFromUuid = defineCachedFunction(fetchMinecraftNameFromUuid, {
+  name: 'mojang-minecraft-name-from-uuid',
+  getKey: (minecraftUuid: string) => minecraftUuid,
+  maxAge: minecraftNameFromUuidCacheTtlSeconds
+})

@@ -60,24 +60,17 @@ async function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entr
   const wasMinecraftUuidDerived = !resolvedEntry.minecraftUuid
   let wasMinecraftNameDerived = false
 
-  if (wasDisplayNameDerived) {
-    if (!resolvedEntry.minecraftName && !resolvedEntry.twitchLogin) {
-      if (!resolvedEntry.minecraftUuid) {
-        throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: weder displayName, minecraftName, twitchLogin noch minecraftUuid in participants.toml angegeben`)
-      }
-
-      try {
-        resolvedEntry.minecraftName = await resolveMinecraftNameFromUuid(resolvedEntry.minecraftUuid)
-      } catch (error) {
-        throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: minecraftName konnte nicht aus minecraftUuid "${resolvedEntry.minecraftUuid}" ermittelt werden`, { cause: error })
-      }
-      wasMinecraftNameDerived = true
+  if (wasDisplayNameDerived && !resolvedEntry.minecraftName && !resolvedEntry.twitchLogin) {
+    if (!resolvedEntry.minecraftUuid) {
+      throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: weder displayName, minecraftName, twitchLogin noch minecraftUuid in participants.toml angegeben`)
     }
-    resolvedEntry.displayName = resolvedEntry.twitchLogin ?? resolvedEntry.minecraftName
-  }
 
-  if (wasIdDerived) {
-    resolvedEntry.id = slugify(resolvedEntry.displayName!)
+    try {
+      resolvedEntry.minecraftName = await resolveMinecraftNameFromUuid(resolvedEntry.minecraftUuid)
+    } catch (error) {
+      throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: minecraftName konnte nicht aus minecraftUuid "${resolvedEntry.minecraftUuid}" ermittelt werden`, { cause: error })
+    }
+    wasMinecraftNameDerived = true
   }
 
   if (wasMinecraftUuidDerived) {
@@ -90,6 +83,29 @@ async function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entr
     } catch (error) {
       throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: minecraftUuid konnte nicht aus minecraftName "${resolvedEntry.minecraftName}" ermittelt werden`, { cause: error })
     }
+  }
+
+  if (resolvedEntry.minecraftName && resolvedEntry.minecraftUuid && !wasMinecraftNameDerived) {
+    try {
+      const canonicalMinecraftName = await resolveMinecraftNameFromUuid(resolvedEntry.minecraftUuid)
+      if (canonicalMinecraftName !== resolvedEntry.minecraftName) {
+        resolvedEntry.minecraftName = canonicalMinecraftName
+        wasMinecraftNameDerived = true
+      }
+    } catch (error) {
+      console.error(
+        `${describeParticipantConfigEntryForErrors(entry, entryIndex)}: aktuelle Schreibweise von minecraftName konnte nicht über Mojang bestätigt werden, bisheriger Wert bleibt bestehen`,
+        error
+      )
+    }
+  }
+
+  if (wasDisplayNameDerived) {
+    resolvedEntry.displayName = resolvedEntry.twitchLogin ?? resolvedEntry.minecraftName
+  }
+
+  if (wasIdDerived) {
+    resolvedEntry.id = slugify(resolvedEntry.displayName!)
   }
 
   return { entry: resolvedEntry as ResolvedParticipantConfigEntry, wasIdDerived, wasDisplayNameDerived, wasMinecraftUuidDerived, wasMinecraftNameDerived }
@@ -162,8 +178,15 @@ export const loadParticipants = defineCachedFunction(async (): Promise<Timestamp
     .map(resolution => resolution.completion)
     .filter(completion => completion !== null)
 
+  const hadUnresolvedConfiguredEntries = configuredCompletions.length !== configuredEntryResolutions.length
+  if (hadUnresolvedConfiguredEntries) {
+    console.error('Auto-Discovery neuer Teilnehmer aus den Stats wird diesen Durchlauf übersprungen, da nicht alle konfigurierten Einträge aufgelöst werden konnten (eine nicht erkannte UUID-Überschneidung könnte sonst zu einem doppelten Eintrag führen)')
+  }
+
   const claimedMinecraftUuids = new Set(configuredCompletions.map(completion => completion.entry.minecraftUuid))
-  const discoveredEntryResolutions = await discoverParticipantConfigEntriesFromStats(claimedMinecraftUuids)
+  const discoveredEntryResolutions = hadUnresolvedConfiguredEntries
+    ? []
+    : await discoverParticipantConfigEntriesFromStats(claimedMinecraftUuids)
   const discoveredCompletions = discoveredEntryResolutions
     .map(resolution => resolution.completion)
     .filter(completion => completion !== null)

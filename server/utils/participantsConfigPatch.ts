@@ -19,6 +19,14 @@ function toTomlStringLiteral(value: string): string {
   return JSON.stringify(value)
 }
 
+function findExistingFieldLineIndexWithinTable(fileLines: string[], headerLineIndex: number, nextHeaderLineIndex: number, fieldName: string): number | null {
+  const fieldAssignmentPattern = new RegExp(`^\\s*${fieldName}\\s*=`)
+  for (let lineIndex = headerLineIndex + 1; lineIndex < nextHeaderLineIndex; lineIndex++) {
+    if (fieldAssignmentPattern.test(fileLines[lineIndex]!)) return lineIndex
+  }
+  return null
+}
+
 export function patchMissingParticipantFieldsIntoFileContents(
   originalFileContents: string,
   fieldCompletions: (ParticipantConfigFieldCompletion | null)[],
@@ -29,31 +37,44 @@ export function patchMissingParticipantFieldsIntoFileContents(
 
   if (tableHeaderLineIndexes.length !== fieldCompletions.length) return null
 
-  const tablePatches: { headerLineIndex: number, fieldCompletion: ParticipantConfigFieldCompletion }[] = []
+  const tablePatches: { headerLineIndex: number, nextHeaderLineIndex: number, fieldCompletion: ParticipantConfigFieldCompletion }[] = []
   tableHeaderLineIndexes.forEach((headerLineIndex, tableIndex) => {
     const fieldCompletion = fieldCompletions[tableIndex]
     if (fieldCompletion === undefined || fieldCompletion === null) return
-    tablePatches.push({ headerLineIndex, fieldCompletion })
+    const nextHeaderLineIndex = tableHeaderLineIndexes[tableIndex + 1] ?? fileLines.length
+    tablePatches.push({ headerLineIndex, nextHeaderLineIndex, fieldCompletion })
   })
 
-  for (const { headerLineIndex, fieldCompletion } of tablePatches.reverse()) {
-    const derivedFieldLines: string[] = []
+  for (const { headerLineIndex, nextHeaderLineIndex, fieldCompletion } of tablePatches.reverse()) {
+    const fieldsToUpsert: { fieldName: string, value: string }[] = []
 
     if (fieldCompletion.wasIdDerived) {
-      derivedFieldLines.push(`id = ${toTomlStringLiteral(fieldCompletion.entry.id)}`)
+      fieldsToUpsert.push({ fieldName: 'id', value: fieldCompletion.entry.id })
     }
     if (fieldCompletion.wasDisplayNameDerived) {
-      derivedFieldLines.push(`displayName = ${toTomlStringLiteral(fieldCompletion.entry.displayName)}`)
+      fieldsToUpsert.push({ fieldName: 'displayName', value: fieldCompletion.entry.displayName })
     }
     if (fieldCompletion.wasMinecraftUuidDerived) {
-      derivedFieldLines.push(`minecraftUuid = ${toTomlStringLiteral(fieldCompletion.entry.minecraftUuid)}`)
+      fieldsToUpsert.push({ fieldName: 'minecraftUuid', value: fieldCompletion.entry.minecraftUuid })
     }
     if (fieldCompletion.wasMinecraftNameDerived && fieldCompletion.entry.minecraftName) {
-      derivedFieldLines.push(`minecraftName = ${toTomlStringLiteral(fieldCompletion.entry.minecraftName)}`)
+      fieldsToUpsert.push({ fieldName: 'minecraftName', value: fieldCompletion.entry.minecraftName })
     }
-    if (derivedFieldLines.length === 0) continue
+    if (fieldsToUpsert.length === 0) continue
 
-    fileLines.splice(headerLineIndex + 1, 0, ...derivedFieldLines)
+    const newFieldLines: string[] = []
+    for (const { fieldName, value } of fieldsToUpsert) {
+      const existingFieldLineIndex = findExistingFieldLineIndexWithinTable(fileLines, headerLineIndex, nextHeaderLineIndex, fieldName)
+      const fieldLine = `${fieldName} = ${toTomlStringLiteral(value)}`
+      if (existingFieldLineIndex === null) {
+        newFieldLines.push(fieldLine)
+      } else {
+        fileLines[existingFieldLineIndex] = fieldLine
+      }
+    }
+    if (newFieldLines.length > 0) {
+      fileLines.splice(headerLineIndex + 1, 0, ...newFieldLines)
+    }
   }
 
   if (newEntriesTomlText === null) return fileLines.join('\n')
