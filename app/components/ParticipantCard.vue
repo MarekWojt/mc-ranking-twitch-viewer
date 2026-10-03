@@ -4,9 +4,9 @@ const props = defineProps<{
   showPercentOfLeader?: boolean
 }>()
 
-const minecraftSkinRenderUrl = computed(() => buildMinecraftBodyRenderUrl(props.participant.minecraftUuid))
+const { data: avatarBundle } = await useMinecraftAvatarBundle()
 
-const minecraftSkinRenderFailed = ref(false)
+const minecraftBodyRenderSrc = computed(() => avatarBundle.value?.bodyRendersByMinecraftUuid[props.participant.minecraftUuid] ?? null)
 
 const cardBackgroundClass = computed(() =>
   buildStatusBackgroundClass(props.participant.isLiveOnTwitch, props.participant.isOnlineOnMinecraftServer)
@@ -35,12 +35,10 @@ const formattedTotalScore = computed(() => Math.round(props.participant.totalSco
         </div>
 
         <img
-          v-if="!minecraftSkinRenderFailed"
-          :src="minecraftSkinRenderUrl"
+          v-if="minecraftBodyRenderSrc"
+          :src="minecraftBodyRenderSrc"
           :alt="`Minecraft-Skin von ${participant.displayName}`"
           class="h-60 w-auto select-none"
-          loading="lazy"
-          @error="minecraftSkinRenderFailed = true"
         >
         <UIcon
           v-else

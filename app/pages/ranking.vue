@@ -4,8 +4,14 @@ import type { TableColumn } from '@nuxt/ui'
 const { data: response, refresh } = await useFetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants')
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 
+const { data: avatarBundle } = await useMinecraftAvatarBundle()
+
 const participants = computed(() => response.value?.payload ?? [])
 const dataAsOf = computed(() => response.value?.asOf ?? null)
+
+function findMinecraftHeadRenderSrc(minecraftUuid: string): string | null {
+  return avatarBundle.value?.headRendersByMinecraftUuid[minecraftUuid] ?? null
+}
 
 const podiumRanks = computed(() => {
   const distinctRanksAscending = [...new Set(participants.value.map(participant => participant.rank))].sort((a, b) => a - b)
@@ -63,11 +69,16 @@ function openParticipantDetail(_event: Event, row: { original: ParticipantListIt
       <template #displayName-cell="{ row }">
         <div class="flex items-center gap-2">
           <img
-            :src="buildMinecraftHeadRenderUrl(row.original.minecraftUuid)"
+            v-if="findMinecraftHeadRenderSrc(row.original.minecraftUuid)"
+            :src="findMinecraftHeadRenderSrc(row.original.minecraftUuid)!"
             :alt="`Minecraft-Kopf von ${row.original.displayName}`"
             class="size-8 rounded"
-            loading="lazy"
           >
+          <UIcon
+            v-else
+            name="i-lucide-user-round"
+            class="size-8 shrink-0 rounded text-muted"
+          />
           <img
             v-if="row.original.twitchProfileImageUrl"
             :src="row.original.twitchProfileImageUrl"

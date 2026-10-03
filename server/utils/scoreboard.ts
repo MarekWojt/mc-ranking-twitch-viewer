@@ -26,13 +26,22 @@ function toOldestFetchedAt(fetchedAtTimestamps: string[]): string {
   return [...fetchedAtTimestamps].sort()[0]!
 }
 
+async function loadOrFallback<T>(loadValue: () => Promise<TimestampedValue<T>>, fallbackValue: T, errorMessage: string): Promise<TimestampedValue<T>> {
+  try {
+    return await loadValue()
+  } catch (error) {
+    console.error(errorMessage, error)
+    return { value: fallbackValue, fetchedAt: new Date().toISOString() }
+  }
+}
+
 export async function computeScoreboard(): Promise<Scoreboard> {
   const [participantsResult, statsResult, onlineStatusResult, liveStreamsResult, profileImageUrlsResult] = await Promise.all([
     loadParticipants(),
     loadAllPlayerStats(),
     getOnlinePlayerUuids(),
-    getLiveTwitchStreamsByLogin(),
-    getTwitchProfileImageUrlsByLogin()
+    loadOrFallback(getLiveTwitchStreamsByLogin, {}, 'Twitch-Live-Status konnte nicht abgerufen werden, alle Teilnehmer gelten als nicht live:'),
+    loadOrFallback(getTwitchProfileImageUrlsByLogin, {}, 'Twitch-Profilbilder konnten nicht abgerufen werden:')
   ])
 
   const participants = participantsResult.value
@@ -53,6 +62,9 @@ export async function computeScoreboard(): Promise<Scoreboard> {
 
   buildMinecraftIconBundle(statisticDefinitions).catch((error) => {
     console.error('Vorab-Laden der Minecraft-Icons im Hintergrund fehlgeschlagen:', error)
+  })
+  buildMinecraftAvatarBundle(participants).catch((error) => {
+    console.error('Vorab-Laden der Minecraft-Avatare im Hintergrund fehlgeschlagen:', error)
   })
 
   const statisticScoresByParticipantId = new Map<string, ParticipantStatisticScore[]>(

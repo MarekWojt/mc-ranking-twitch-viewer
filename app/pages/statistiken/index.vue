@@ -18,6 +18,7 @@ const { data: response, refresh } = await useFetch<DataWithFreshness<StatisticLi
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 
 const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+const { data: avatarBundle } = await useMinecraftAvatarBundle()
 
 const statistics = computed(() => response.value?.payload ?? [])
 const dataAsOf = computed(() => response.value?.asOf ?? null)
@@ -114,6 +115,7 @@ function buildActionColumns(statisticsToPivot: StatisticListItemDto[]): TableCol
 
       const primaryLeader = cell.leaders[0]!
       const allLeaderNames = cell.leaders.map(leader => leader.displayName).join(', ')
+      const avatarSrc = avatarBundle.value?.avatarRendersByMinecraftUuid[primaryLeader.minecraftUuid] ?? null
 
       return h('button', {
         type: 'button',
@@ -124,11 +126,9 @@ function buildActionColumns(statisticsToPivot: StatisticListItemDto[]): TableCol
           navigateTo(`/statistiken/${cell.slug}`)
         }
       }, [
-        h('img', {
-          src: buildMinecraftAvatarIconUrl(primaryLeader.minecraftUuid),
-          alt: allLeaderNames,
-          class: 'size-6 rounded'
-        }),
+        avatarSrc
+          ? h('img', { src: avatarSrc, alt: allLeaderNames, class: 'size-6 rounded' })
+          : h(resolveComponent('UIcon'), { name: 'i-lucide-user-round', class: 'size-6 shrink-0 rounded text-muted' }),
         h('span', { class: 'text-sm tabular-nums' }, cell.maxValue.toLocaleString('de-DE'))
       ])
     }

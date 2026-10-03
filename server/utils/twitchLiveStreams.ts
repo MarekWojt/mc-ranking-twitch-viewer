@@ -45,23 +45,18 @@ export const getLiveTwitchStreamsByLogin = defineCachedFunction(async (): Promis
   )]
   if (twitchLogins.length === 0) return { value: {}, fetchedAt: new Date().toISOString() }
 
-  try {
-    const batches = splitIntoBatches(twitchLogins, TWITCH_HELIX_LOGIN_BATCH_SIZE)
-    const batchResults = await Promise.all(batches.map(fetchLiveStreamsBatch))
+  const batches = splitIntoBatches(twitchLogins, TWITCH_HELIX_LOGIN_BATCH_SIZE)
+  const batchResults = await Promise.all(batches.map(fetchLiveStreamsBatch))
 
-    const liveStreamsByTwitchLogin = Object.fromEntries(batchResults.flat().map(entry => [
-      entry.user_login.toLowerCase(),
-      {
-        userLogin: entry.user_login,
-        title: entry.title,
-        gameName: entry.game_name,
-        viewerCount: entry.viewer_count,
-        startedAt: entry.started_at
-      } satisfies TwitchLiveStream
-    ]))
-    return { value: liveStreamsByTwitchLogin, fetchedAt: new Date().toISOString() }
-  } catch (error) {
-    console.error('Twitch-Live-Status konnte nicht abgerufen werden, alle Teilnehmer gelten als nicht live:', error)
-    return { value: {}, fetchedAt: new Date().toISOString() }
-  }
+  const liveStreamsByTwitchLogin = Object.fromEntries(batchResults.flat().map(entry => [
+    entry.user_login.toLowerCase(),
+    {
+      userLogin: entry.user_login,
+      title: entry.title,
+      gameName: entry.game_name,
+      viewerCount: entry.viewer_count,
+      startedAt: entry.started_at
+    } satisfies TwitchLiveStream
+  ]))
+  return { value: liveStreamsByTwitchLogin, fetchedAt: new Date().toISOString() }
 }, twitchLiveStreamsCacheOptions)

@@ -47,16 +47,11 @@ export const getTwitchProfileImageUrlsByLogin = defineCachedFunction(async (): P
   )]
   if (twitchLogins.length === 0) return { value: {}, fetchedAt: new Date().toISOString() }
 
-  try {
-    const batches = splitIntoBatches(twitchLogins, TWITCH_HELIX_LOGIN_BATCH_SIZE)
-    const batchResults = await Promise.all(batches.map(fetchUserProfilesBatch))
+  const batches = splitIntoBatches(twitchLogins, TWITCH_HELIX_LOGIN_BATCH_SIZE)
+  const batchResults = await Promise.all(batches.map(fetchUserProfilesBatch))
 
-    const profileImageUrlByTwitchLogin = Object.fromEntries(
-      batchResults.flat().map(entry => [entry.login.toLowerCase(), entry.profile_image_url])
-    )
-    return { value: profileImageUrlByTwitchLogin, fetchedAt: new Date().toISOString() }
-  } catch (error) {
-    console.error('Twitch-Profilbilder konnten nicht abgerufen werden:', error)
-    return { value: {}, fetchedAt: new Date().toISOString() }
-  }
+  const profileImageUrlByTwitchLogin = Object.fromEntries(
+    batchResults.flat().map(entry => [entry.login.toLowerCase(), entry.profile_image_url])
+  )
+  return { value: profileImageUrlByTwitchLogin, fetchedAt: new Date().toISOString() }
 }, twitchUserProfileCacheOptions)
