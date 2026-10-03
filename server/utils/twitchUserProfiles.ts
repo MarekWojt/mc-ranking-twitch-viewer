@@ -1,5 +1,6 @@
 interface TwitchGetUsersResponseEntry {
   login: string
+  display_name: string
   profile_image_url: string
 }
 
@@ -18,6 +19,18 @@ async function fetchUserProfilesBatch(twitchLogins: string[]): Promise<TwitchGet
   }))
   return response.data
 }
+
+const twitchDisplayNameFromLoginCacheTtlSeconds = 60 * 60 * 24
+
+export const resolveTwitchDisplayNameFromLogin = defineCachedFunction(async (twitchLogin: string): Promise<string> => {
+  const [profile] = await fetchUserProfilesBatch([twitchLogin])
+  if (!profile) throw new Error(`Twitch-Nutzer "${twitchLogin}" wurde nicht gefunden`)
+  return profile.display_name
+}, {
+  name: 'twitch-display-name-from-login',
+  getKey: (twitchLogin: string) => twitchLogin.toLowerCase(),
+  maxAge: twitchDisplayNameFromLoginCacheTtlSeconds
+})
 
 const twitchUserProfileCacheTtlSeconds = 60 * 60
 

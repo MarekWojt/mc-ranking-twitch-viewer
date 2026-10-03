@@ -101,7 +101,19 @@ async function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entr
   }
 
   if (wasDisplayNameDerived) {
-    resolvedEntry.displayName = resolvedEntry.twitchLogin ?? resolvedEntry.minecraftName
+    if (resolvedEntry.twitchLogin) {
+      try {
+        resolvedEntry.displayName = await resolveTwitchDisplayNameFromLogin(resolvedEntry.twitchLogin)
+      } catch (error) {
+        console.error(
+          `${describeParticipantConfigEntryForErrors(entry, entryIndex)}: Schreibweise des Twitch-Namens konnte nicht über Twitch bestätigt werden, verwende twitchLogin unverändert als displayName`,
+          error
+        )
+        resolvedEntry.displayName = resolvedEntry.twitchLogin
+      }
+    } else {
+      resolvedEntry.displayName = resolvedEntry.minecraftName
+    }
   }
 
   if (wasIdDerived) {
