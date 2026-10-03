@@ -17,10 +17,10 @@ export async function fetchFreshTwitchAppAccessToken(): Promise<string> {
   return response.access_token
 }
 
-const twitchAppAccessTokenCacheTtlSeconds = 60 * 50
-
-export const getTwitchAppAccessToken = defineCachedFunction(fetchFreshTwitchAppAccessToken, {
+const twitchAppAccessTokenCacheOptions = {
   name: 'twitch-app-access-token',
   getKey: () => 'all',
-  maxAge: twitchAppAccessTokenCacheTtlSeconds
-})
+  maxAge: 60 * 50
+}
+
+export const getTwitchAppAccessToken = defineCachedFunction(fetchFreshTwitchAppAccessToken, twitchAppAccessTokenCacheOptions)

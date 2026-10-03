@@ -20,19 +20,23 @@ async function fetchUserProfilesBatch(twitchLogins: string[]): Promise<TwitchGet
   return response.data
 }
 
-const twitchDisplayNameFromLoginCacheTtlSeconds = 60 * 60 * 24
+const twitchDisplayNameFromLoginCacheOptions = {
+  name: 'twitch-display-name-from-login',
+  getKey: (twitchLogin: string) => twitchLogin.toLowerCase(),
+  maxAge: 60 * 60 * 24
+}
 
 export const resolveTwitchDisplayNameFromLogin = defineCachedFunction(async (twitchLogin: string): Promise<string> => {
   const [profile] = await fetchUserProfilesBatch([twitchLogin])
   if (!profile) throw new Error(`Twitch-Nutzer "${twitchLogin}" wurde nicht gefunden`)
   return profile.display_name
-}, {
-  name: 'twitch-display-name-from-login',
-  getKey: (twitchLogin: string) => twitchLogin.toLowerCase(),
-  maxAge: twitchDisplayNameFromLoginCacheTtlSeconds
-})
+}, twitchDisplayNameFromLoginCacheOptions)
 
-const twitchUserProfileCacheTtlSeconds = 60 * 60
+const twitchUserProfileCacheOptions = {
+  name: 'twitch-user-profiles',
+  getKey: () => 'all',
+  maxAge: 60 * 60
+}
 
 export const getTwitchProfileImageUrlsByLogin = defineCachedFunction(async (): Promise<TimestampedValue<Record<string, string>>> => {
   const { value: participants } = await loadParticipants()
@@ -55,8 +59,4 @@ export const getTwitchProfileImageUrlsByLogin = defineCachedFunction(async (): P
     console.error('Twitch-Profilbilder konnten nicht abgerufen werden:', error)
     return { value: {}, fetchedAt: new Date().toISOString() }
   }
-}, {
-  name: 'twitch-user-profiles',
-  getKey: () => 'all',
-  maxAge: twitchUserProfileCacheTtlSeconds
-})
+}, twitchUserProfileCacheOptions)

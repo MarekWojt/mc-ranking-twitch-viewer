@@ -30,7 +30,11 @@ async function fetchLiveStreamsBatch(twitchLogins: string[]): Promise<TwitchGetS
   return response.data
 }
 
-const twitchLiveStatusCacheTtlSeconds = useRuntimeConfig().twitchLiveStatusCacheTtlSeconds
+const twitchLiveStreamsCacheOptions = {
+  name: 'twitch-live-streams',
+  getKey: () => 'all',
+  maxAge: useRuntimeConfig().twitchLiveStatusCacheTtlSeconds
+}
 
 export const getLiveTwitchStreamsByLogin = defineCachedFunction(async (): Promise<TimestampedValue<Record<string, TwitchLiveStream>>> => {
   const { value: participants } = await loadParticipants()
@@ -60,8 +64,4 @@ export const getLiveTwitchStreamsByLogin = defineCachedFunction(async (): Promis
     console.error('Twitch-Live-Status konnte nicht abgerufen werden, alle Teilnehmer gelten als nicht live:', error)
     return { value: {}, fetchedAt: new Date().toISOString() }
   }
-}, {
-  name: 'twitch-live-streams',
-  getKey: () => 'all',
-  maxAge: twitchLiveStatusCacheTtlSeconds
-})
+}, twitchLiveStreamsCacheOptions)

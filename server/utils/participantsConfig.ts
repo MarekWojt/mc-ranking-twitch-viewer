@@ -178,7 +178,11 @@ function toValidatedParticipants(entries: ResolvedParticipantConfigEntry[]): Par
   })
 }
 
-const participantsConfigCacheTtlSeconds = 60
+const participantsConfigCacheOptions = {
+  name: 'participants-config',
+  getKey: () => 'all',
+  maxAge: 60
+}
 
 export const loadParticipants = defineCachedFunction(async (): Promise<TimestampedValue<Participant[]>> => {
   const fileContents = await readParticipantsConfigFile()
@@ -224,8 +228,4 @@ export const loadParticipants = defineCachedFunction(async (): Promise<Timestamp
   }
 
   return { value: toValidatedParticipants(resolvedEntries), fetchedAt: new Date().toISOString() }
-}, {
-  name: 'participants-config',
-  getKey: () => 'all',
-  maxAge: participantsConfigCacheTtlSeconds
-})
+}, participantsConfigCacheOptions)

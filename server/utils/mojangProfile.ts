@@ -18,10 +18,10 @@ async function fetchMinecraftNameFromUuid(minecraftUuid: string): Promise<string
   return profile.name
 }
 
-const minecraftNameFromUuidCacheTtlSeconds = 60 * 60 * 24
-
-export const resolveMinecraftNameFromUuid = defineCachedFunction(fetchMinecraftNameFromUuid, {
+const minecraftNameFromUuidCacheOptions = {
   name: 'mojang-minecraft-name-from-uuid',
   getKey: (minecraftUuid: string) => minecraftUuid,
-  maxAge: minecraftNameFromUuidCacheTtlSeconds
-})
+  maxAge: 60 * 60 * 24
+}
+
+export const resolveMinecraftNameFromUuid = defineCachedFunction(fetchMinecraftNameFromUuid, minecraftNameFromUuidCacheOptions)

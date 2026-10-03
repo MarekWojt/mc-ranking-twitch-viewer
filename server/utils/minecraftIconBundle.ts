@@ -3,7 +3,11 @@ function stripMinecraftNamespace(minecraftId: string): string {
   return namespaceSeparatorIndex === -1 ? minecraftId : minecraftId.slice(namespaceSeparatorIndex + 1)
 }
 
-const minecraftIconBundleCacheTtlSeconds = 86400
+const minecraftIconBundleCacheOptions = {
+  name: 'minecraft-icon-bundle',
+  getKey: () => 'all',
+  maxAge: 86400
+}
 
 export const buildMinecraftIconBundle = defineCachedFunction(async (statisticDefinitions: StatisticDefinition[]): Promise<MinecraftIconBundleDto> => {
   const itemBareIds = [...new Set(
@@ -19,8 +23,4 @@ export const buildMinecraftIconBundle = defineCachedFunction(async (statisticDef
   ])
 
   return { itemIconsByBareId, entityIconsByBareId }
-}, {
-  name: 'minecraft-icon-bundle',
-  getKey: () => 'all',
-  maxAge: minecraftIconBundleCacheTtlSeconds
-})
+}, minecraftIconBundleCacheOptions)

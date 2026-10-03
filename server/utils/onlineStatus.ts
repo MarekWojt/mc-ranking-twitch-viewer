@@ -9,7 +9,11 @@ async function readFileIfExists(filePath: string): Promise<string | null> {
   }
 }
 
-const onlineStatusCacheTtlSeconds = useRuntimeConfig().minecraftOnlineStatusCacheTtlSeconds
+const onlineStatusCacheOptions = {
+  name: 'minecraft-online-players',
+  getKey: () => 'all',
+  maxAge: useRuntimeConfig().minecraftOnlineStatusCacheTtlSeconds
+}
 
 export const getOnlinePlayerUuids = defineCachedFunction(async (): Promise<TimestampedValue<string[]>> => {
   const { minecraftOnlinePlayersFilePath } = useRuntimeConfig()
@@ -23,8 +27,4 @@ export const getOnlinePlayerUuids = defineCachedFunction(async (): Promise<Times
         .map(normalizeMinecraftUuid)
 
   return { value: onlinePlayerUuids, fetchedAt: new Date().toISOString() }
-}, {
-  name: 'minecraft-online-players',
-  getKey: () => 'all',
-  maxAge: onlineStatusCacheTtlSeconds
-})
+}, onlineStatusCacheOptions)
