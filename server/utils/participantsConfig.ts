@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml'
 
 interface ParticipantsTomlFile {
+  autoAddFromStats?: boolean
   participants?: ParticipantConfigEntry[]
 }
 
@@ -188,6 +189,10 @@ export const loadParticipants = defineCachedFunction(async (): Promise<Timestamp
   const fileContents = await readParticipantsConfigFile()
   const parsedFile = parseToml(fileContents) as unknown as ParticipantsTomlFile
   const rawEntries = parsedFile.participants ?? []
+  const isAutoAddFromStatsEnabled = parsedFile.autoAddFromStats ?? true
+  if (!isAutoAddFromStatsEnabled) {
+    console.log('Auto-Discovery neuer Teilnehmer aus den Stats ist deaktiviert (autoAddFromStats = false in participants.toml)')
+  }
 
   const configuredEntryResolutions = await resolveParticipantConfigEntriesTolerantly(rawEntries)
   const configuredCompletions = configuredEntryResolutions
@@ -195,12 +200,12 @@ export const loadParticipants = defineCachedFunction(async (): Promise<Timestamp
     .filter(completion => completion !== null)
 
   const hadUnresolvedConfiguredEntries = configuredCompletions.length !== configuredEntryResolutions.length
-  if (hadUnresolvedConfiguredEntries) {
+  if (isAutoAddFromStatsEnabled && hadUnresolvedConfiguredEntries) {
     console.error('Auto-Discovery neuer Teilnehmer aus den Stats wird diesen Durchlauf übersprungen, da nicht alle konfigurierten Einträge aufgelöst werden konnten (eine nicht erkannte UUID-Überschneidung könnte sonst zu einem doppelten Eintrag führen)')
   }
 
   const claimedMinecraftUuids = new Set(configuredCompletions.map(completion => completion.entry.minecraftUuid))
-  const discoveredEntryResolutions = hadUnresolvedConfiguredEntries
+  const discoveredEntryResolutions = (hadUnresolvedConfiguredEntries || !isAutoAddFromStatsEnabled)
     ? []
     : await discoverParticipantConfigEntriesFromStats(claimedMinecraftUuids)
   const discoveredCompletions = discoveredEntryResolutions

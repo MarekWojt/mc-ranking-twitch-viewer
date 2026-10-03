@@ -1,3 +1,6 @@
+# Setting this to false will disable automatically adding users from stats (and only show users already in this file)
+autoAddFromStats = true
+
 [[participants]]
 id = "steve"
 displayName = "Steve"
