@@ -63,9 +63,3 @@ export interface MinecraftIconBundleDto {
   itemIconsByBareId: Record<string, string>
   entityIconsByBareId: Record<string, string>
 }
-
-export interface MinecraftAvatarBundleDto {
-  bodyRendersByMinecraftUuid: Record<string, string>
-  headRendersByMinecraftUuid: Record<string, string>
-  avatarRendersByMinecraftUuid: Record<string, string>
-}

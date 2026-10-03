@@ -4,13 +4,13 @@ import type { TableColumn } from '@nuxt/ui'
 const { data: response, refresh } = await useFetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants')
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 
-const { data: avatarBundle } = await useMinecraftAvatarBundle()
-
 const participants = computed(() => response.value?.payload ?? [])
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
-function findMinecraftHeadRenderSrc(minecraftUuid: string): string | null {
-  return avatarBundle.value?.headRendersByMinecraftUuid[minecraftUuid] ?? null
+const failedMinecraftHeadRenderUuids = ref(new Set<string>())
+
+function markMinecraftHeadRenderFailed(minecraftUuid: string) {
+  failedMinecraftHeadRenderUuids.value.add(minecraftUuid)
 }
 
 const podiumRanks = computed(() => {
@@ -69,10 +69,12 @@ function openParticipantDetail(_event: Event, row: { original: ParticipantListIt
       <template #displayName-cell="{ row }">
         <div class="flex items-center gap-2">
           <img
-            v-if="findMinecraftHeadRenderSrc(row.original.minecraftUuid)"
-            :src="findMinecraftHeadRenderSrc(row.original.minecraftUuid)!"
+            v-if="!failedMinecraftHeadRenderUuids.has(row.original.minecraftUuid)"
+            :src="buildMinecraftAvatarRenderUrl(row.original.minecraftUuid, 'head')"
             :alt="`Minecraft-Kopf von ${row.original.displayName}`"
             class="size-8 rounded"
+            loading="lazy"
+            @error="markMinecraftHeadRenderFailed(row.original.minecraftUuid)"
           >
           <UIcon
             v-else

@@ -63,9 +63,6 @@ export async function computeScoreboard(): Promise<Scoreboard> {
   buildMinecraftIconBundle(statisticDefinitions).catch((error) => {
     console.error('Vorab-Laden der Minecraft-Icons im Hintergrund fehlgeschlagen:', error)
   })
-  buildMinecraftAvatarBundle(participants).catch((error) => {
-    console.error('Vorab-Laden der Minecraft-Avatare im Hintergrund fehlgeschlagen:', error)
-  })
 
   const statisticScoresByParticipantId = new Map<string, ParticipantStatisticScore[]>(
     participants.map(participant => [participant.id, []])
