@@ -41,6 +41,8 @@ export interface StatisticListItemDto {
   specificSubgroup: SpecificStatisticSubgroup | null
   maxValue: number
   maxDisplayValue: string
+  totalValue: number
+  totalDisplayValue: string
   leaders: StatisticLeaderDto[]
 }
 

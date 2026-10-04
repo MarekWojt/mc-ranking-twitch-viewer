@@ -27,6 +27,7 @@ export default defineEventHandler(async (): Promise<DataWithFreshness<StatisticL
     payload: scoreboard.statisticDefinitions.map((definition): StatisticListItemDto => {
       const scoresForThisStatistic = scoresBySlug.get(definition.slug) ?? []
       const maxValue = Math.max(0, ...scoresForThisStatistic.map(entry => entry.value))
+      const totalValue = scoresForThisStatistic.reduce((sum, entry) => sum + entry.value, 0)
       const leaders = maxValue === 0
         ? []
         : scoresForThisStatistic
@@ -42,6 +43,8 @@ export default defineEventHandler(async (): Promise<DataWithFreshness<StatisticL
         specificSubgroup: definition.specificSubgroup,
         maxValue,
         maxDisplayValue: formatStatisticDisplayValue(definition.key, maxValue),
+        totalValue,
+        totalDisplayValue: formatStatisticDisplayValue(definition.key, totalValue),
         leaders
       }
     })

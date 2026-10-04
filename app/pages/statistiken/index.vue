@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
+import type { VNodeChild } from 'vue'
 
 interface PivotedActionCell {
   slug: string
   maxValue: number
   maxDisplayValue: string
+  totalValue: number
+  totalDisplayValue: string
   leaders: StatisticLeaderDto[]
 }
 
@@ -17,6 +20,7 @@ interface PivotedStatisticRow {
   objectKey: string
   objectLabel: string
   cellsByActionLabel: Record<string, PivotedActionCell | undefined>
+  maxValueAcrossActions: number
   totalValueAcrossActions: number
 }
 
@@ -91,6 +95,8 @@ const statisticTabItems = [
   { label: 'Entities', value: 'entities', slot: 'entities' as const }
 ]
 
+const activeStatisticTab = ref<string>('allgemein')
+
 function openStatisticDetail(_event: Event, row: { original: StatisticListItemDto }) {
   navigateTo(`/statistiken/${row.original.slug}`)
 }
@@ -102,14 +108,14 @@ function renderStatisticLeaderCell(slug: string, leaders: StatisticLeaderDto[], 
 
   return h('button', {
     type: 'button',
-    class: 'flex items-center gap-1.5 hover:opacity-80',
+    class: 'flex shrink-0 items-center gap-1.5 hover:opacity-80',
     title: allLeaderNames,
     onClick: (event: MouseEvent) => {
       event.stopPropagation()
       navigateTo(`/statistiken/${slug}`)
     }
   }, [
-    h('div', { class: 'flex flex-wrap gap-1 max-w-20' }, leaders.map(leader =>
+    h('div', { class: 'flex shrink-0 flex-wrap gap-1 max-w-20' }, leaders.map(leader =>
       h('img', {
         key: leader.minecraftUuid,
         src: buildMinecraftAvatarRenderUrl(leader.minecraftUuid, 'avatar'),
@@ -143,26 +149,26 @@ function buildPivotedStatisticRows(statisticsToPivot: StatisticListItemDto[]): P
     if (statistic.groupLabel === null) continue
 
     const row = rowsByObjectLabel.get(statistic.label)
-      ?? { objectKey: statistic.key, objectLabel: statistic.label, cellsByActionLabel: {}, totalValueAcrossActions: 0 }
+      ?? { objectKey: statistic.key, objectLabel: statistic.label, cellsByActionLabel: {}, maxValueAcrossActions: 0, totalValueAcrossActions: 0 }
     row.cellsByActionLabel[statistic.groupLabel] = {
       slug: statistic.slug,
       maxValue: statistic.maxValue,
       maxDisplayValue: statistic.maxDisplayValue,
+      totalValue: statistic.totalValue,
+      totalDisplayValue: statistic.totalDisplayValue,
       leaders: statistic.leaders
     }
     rowsByObjectLabel.set(statistic.label, row)
   }
 
   for (const row of rowsByObjectLabel.values()) {
-    row.totalValueAcrossActions = Object.values(row.cellsByActionLabel)
+    row.maxValueAcrossActions = Object.values(row.cellsByActionLabel)
       .reduce((sum, cell) => sum + (cell?.maxValue ?? 0), 0)
+    row.totalValueAcrossActions = Object.values(row.cellsByActionLabel)
+      .reduce((sum, cell) => sum + (cell?.totalValue ?? 0), 0)
   }
 
   return [...rowsByObjectLabel.values()]
-}
-
-function sortRowsByTotalValueAcrossActionsDescending(rows: PivotedStatisticRow[]): PivotedStatisticRow[] {
-  return [...rows].sort((a, b) => b.totalValueAcrossActions - a.totalValueAcrossActions)
 }
 
 const ITEM_ACTION_ICON_BY_LABEL: Record<string, string> = {
@@ -179,25 +185,54 @@ const ENTITY_ACTION_ICON_BY_LABEL: Record<string, string> = {
   'Killed By': '☠️'
 }
 
+type SortableColumn = { getIsSorted: () => false | 'asc' | 'desc', toggleSorting: () => void }
+
+function renderSortableColumnHeader(column: SortableColumn, content: VNodeChild) {
+  const sortDirection = column.getIsSorted()
+  const sortIndicator = sortDirection === 'asc' ? '↑' : sortDirection === 'desc' ? '↓' : '↕'
+
+  return h('button', {
+    type: 'button',
+    class: 'inline-flex items-center gap-1 hover:text-highlighted',
+    onClick: () => column.toggleSorting()
+  }, [content, h('span', { class: 'text-xs text-muted' }, sortIndicator)])
+}
+
+type PivotValueMode = 'max' | 'total'
+
+const pivotValueMode = ref<PivotValueMode>('max')
+
 function buildActionColumns(
   statisticsToPivot: StatisticListItemDto[],
   resolveHeaderIcon: (actionLabel: string) => string | null = () => null
 ): TableColumn<PivotedStatisticRow>[] {
+  const valueMode = pivotValueMode.value
   const actionLabels = [...new Set(
     statisticsToPivot.map(statistic => statistic.groupLabel).filter((label): label is string => label !== null)
   )].sort()
 
   return actionLabels.map((actionLabel) => {
     const headerIcon = resolveHeaderIcon(actionLabel)
+    const headerContent = h('span', { title: actionLabel, class: 'inline-flex items-center gap-1' }, headerIcon
+      ? [h('span', { class: 'text-lg' }, headerIcon), h('span', {}, actionLabel)]
+      : actionLabel)
 
     return {
       id: actionLabel,
-      header: () => h('span', { title: actionLabel, class: 'inline-flex items-center gap-1' }, headerIcon
-        ? [h('span', { class: 'text-lg' }, headerIcon), h('span', {}, actionLabel)]
-        : actionLabel),
+      accessorFn: (row: PivotedStatisticRow) => {
+        const cell = row.cellsByActionLabel[actionLabel]
+        if (!cell) return 0
+        return valueMode === 'max' ? cell.maxValue : cell.totalValue
+      },
+      header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, headerContent),
       cell: ({ row }: { row: { original: PivotedStatisticRow } }) => {
         const cell = row.original.cellsByActionLabel[actionLabel]
         if (!cell) return '–'
+        if (valueMode === 'total') {
+          return row.original.objectKey === TOTALS_ROW_OBJECT_KEY
+            ? renderBoldTabularNumber(cell.totalValue)
+            : h('span', { class: 'text-sm tabular-nums' }, cell.totalDisplayValue)
+        }
         if (row.original.objectKey === TOTALS_ROW_OBJECT_KEY) return renderBoldTabularNumber(cell.maxValue)
         return renderStatisticLeaderCell(cell.slug, cell.leaders, cell.maxDisplayValue)
       }
@@ -205,10 +240,16 @@ function buildActionColumns(
   })
 }
 
-const totalValueAcrossActionsColumn: TableColumn<PivotedStatisticRow> = {
-  id: 'totalValueAcrossActions',
-  header: 'Gesamt',
-  cell: ({ row }) => renderBoldTabularNumber(row.original.totalValueAcrossActions)
+function buildTotalValueAcrossActionsColumn(): TableColumn<PivotedStatisticRow> {
+  const valueMode = pivotValueMode.value
+
+  return {
+    id: 'valueAcrossActions',
+    accessorFn: (row: PivotedStatisticRow) => valueMode === 'max' ? row.maxValueAcrossActions : row.totalValueAcrossActions,
+    header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, 'Gesamt'),
+    cell: ({ row }: { row: { original: PivotedStatisticRow } }) =>
+      renderBoldTabularNumber(valueMode === 'max' ? row.original.maxValueAcrossActions : row.original.totalValueAcrossActions)
+  }
 }
 
 function renderBoldTabularNumber(value: number) {
@@ -225,42 +266,62 @@ const pivotTableRowMeta = {
 }
 
 function buildTotalsRow(statisticsToPivot: StatisticListItemDto[]): PivotedStatisticRow {
-  const totalByActionLabel: Record<string, number> = {}
+  const maxValueSumByActionLabel: Record<string, number> = {}
+  const totalValueSumByActionLabel: Record<string, number> = {}
   for (const statistic of statisticsToPivot) {
     if (statistic.groupLabel === null) continue
-    totalByActionLabel[statistic.groupLabel] = (totalByActionLabel[statistic.groupLabel] ?? 0) + statistic.maxValue
+    maxValueSumByActionLabel[statistic.groupLabel] = (maxValueSumByActionLabel[statistic.groupLabel] ?? 0) + statistic.maxValue
+    totalValueSumByActionLabel[statistic.groupLabel] = (totalValueSumByActionLabel[statistic.groupLabel] ?? 0) + statistic.totalValue
   }
 
   return {
     objectKey: TOTALS_ROW_OBJECT_KEY,
     objectLabel: 'Gesamt',
     cellsByActionLabel: Object.fromEntries(
-      Object.entries(totalByActionLabel).map(([actionLabel, value]) =>
-        [actionLabel, { slug: '', maxValue: value, maxDisplayValue: value.toLocaleString('de-DE'), leaders: [] }]
-      )
+      Object.keys(maxValueSumByActionLabel).map((actionLabel) => {
+        const maxValue = maxValueSumByActionLabel[actionLabel]!
+        const totalValue = totalValueSumByActionLabel[actionLabel]!
+        return [actionLabel, {
+          slug: '',
+          maxValue,
+          maxDisplayValue: maxValue.toLocaleString('de-DE'),
+          totalValue,
+          totalDisplayValue: totalValue.toLocaleString('de-DE'),
+          leaders: []
+        }]
+      })
     ),
-    totalValueAcrossActions: Object.values(totalByActionLabel).reduce((sum, value) => sum + value, 0)
+    maxValueAcrossActions: Object.values(maxValueSumByActionLabel).reduce((sum, value) => sum + value, 0),
+    totalValueAcrossActions: Object.values(totalValueSumByActionLabel).reduce((sum, value) => sum + value, 0)
   }
 }
 
-const itemPivotRows = computed(() => [
-  buildTotalsRow(itemStatistics.value),
-  ...sortRowsByTotalValueAcrossActionsDescending(buildPivotedStatisticRows(itemStatistics.value))
-])
+const pivotTableInitialState = { sorting: [{ id: 'valueAcrossActions', desc: true }] }
+
+const itemPivotRows = computed(() => {
+  void pivotValueMode.value // read so this computed (and thus the table's sorted row model) re-runs on toggle, not just the columns
+  return [
+    buildTotalsRow(itemStatistics.value),
+    ...buildPivotedStatisticRows(itemStatistics.value)
+  ]
+})
 const itemPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
-  { accessorKey: 'objectLabel', header: 'Objekt' },
+  { accessorKey: 'objectLabel', header: 'Objekt', enableSorting: false },
   ...buildActionColumns(itemStatistics.value, actionLabel => ITEM_ACTION_ICON_BY_LABEL[actionLabel] ?? null),
-  totalValueAcrossActionsColumn
+  buildTotalValueAcrossActionsColumn()
 ])
 
-const entityPivotRows = computed(() => [
-  buildTotalsRow(entityStatistics.value),
-  ...sortRowsByTotalValueAcrossActionsDescending(buildPivotedStatisticRows(entityStatistics.value))
-])
+const entityPivotRows = computed(() => {
+  void pivotValueMode.value // see itemPivotRows: forces this computed to re-run on toggle
+  return [
+    buildTotalsRow(entityStatistics.value),
+    ...buildPivotedStatisticRows(entityStatistics.value)
+  ]
+})
 const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
-  { accessorKey: 'objectLabel', header: 'Objekt' },
+  { accessorKey: 'objectLabel', header: 'Objekt', enableSorting: false },
   ...buildActionColumns(entityStatistics.value, actionLabel => ENTITY_ACTION_ICON_BY_LABEL[actionLabel] ?? null),
-  totalValueAcrossActionsColumn
+  buildTotalValueAcrossActionsColumn()
 ])
 </script>
 
@@ -280,72 +341,102 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
       </div>
     </div>
 
-    <UTabs
-      :items="statisticTabItems"
-      default-value="allgemein"
-      variant="link"
-      :ui="{ content: 'mt-6' }"
-    >
-      <template #allgemein>
-        <div class="space-y-6">
-          <div
-            v-for="themeGroup in generalStatisticThemeGroups"
-            :key="themeGroup.theme"
-            class="space-y-3"
-          >
-            <h3 class="text-sm font-medium text-muted">
-              {{ themeGroup.theme }}
-            </h3>
-            <UTable
-              :data="themeGroup.statistics"
-              :columns="generalStatisticTableColumns"
-              @select="openStatisticDetail"
-            />
+    <div class="relative">
+      <UTabs
+        v-model="activeStatisticTab"
+        :items="statisticTabItems"
+        variant="link"
+        :ui="{ content: 'mt-6 min-w-0' }"
+      >
+        <template #allgemein>
+          <div class="space-y-6">
+            <div
+              v-for="themeGroup in generalStatisticThemeGroups"
+              :key="themeGroup.theme"
+              class="space-y-3"
+            >
+              <h3 class="text-sm font-medium text-muted">
+                {{ themeGroup.theme }}
+              </h3>
+              <UTable
+                :data="themeGroup.statistics"
+                :columns="generalStatisticTableColumns"
+                @select="openStatisticDetail"
+              />
+            </div>
           </div>
-        </div>
-      </template>
+        </template>
 
-      <template #items>
-        <UTable
-          :data="itemPivotRows"
-          :columns="itemPivotColumns"
-          :meta="pivotTableRowMeta"
-        >
-          <template #objectLabel-cell="{ row }">
-            <span
-              v-if="row.original.objectKey === TOTALS_ROW_OBJECT_KEY"
-              class="text-sm font-medium"
-            >Gesamt</span>
-            <MinecraftObjectIcon
-              v-else
-              :src="findItemIconSrc(row.original.objectKey)"
-              :alt="row.original.objectLabel"
-              kind="item"
-            />
-          </template>
-        </UTable>
-      </template>
+        <template #items>
+          <UTable
+            :data="itemPivotRows"
+            :columns="itemPivotColumns"
+            :meta="pivotTableRowMeta"
+            :get-row-id="(row: PivotedStatisticRow) => row.objectKey"
+            :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
+            :initial-state="pivotTableInitialState"
+          >
+            <template #objectLabel-cell="{ row }">
+              <span
+                v-if="row.original.objectKey === TOTALS_ROW_OBJECT_KEY"
+                class="text-sm font-medium"
+              >Gesamt</span>
+              <MinecraftObjectIcon
+                v-else
+                :src="findItemIconSrc(row.original.objectKey)"
+                :alt="row.original.objectLabel"
+                kind="item"
+              />
+            </template>
+          </UTable>
+        </template>
 
-      <template #entities>
-        <UTable
-          :data="entityPivotRows"
-          :columns="entityPivotColumns"
-          :meta="pivotTableRowMeta"
+        <template #entities>
+          <UTable
+            :data="entityPivotRows"
+            :columns="entityPivotColumns"
+            :meta="pivotTableRowMeta"
+            :get-row-id="(row: PivotedStatisticRow) => row.objectKey"
+            :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
+            :initial-state="pivotTableInitialState"
+          >
+            <template #objectLabel-cell="{ row }">
+              <span
+                v-if="row.original.objectKey === TOTALS_ROW_OBJECT_KEY"
+                class="text-sm font-medium"
+              >Gesamt</span>
+              <MinecraftObjectIcon
+                v-else
+                :src="findEntityIconSrc(row.original.objectKey)"
+                :alt="row.original.objectLabel"
+                kind="entity"
+              />
+            </template>
+          </UTable>
+        </template>
+      </UTabs>
+
+      <div
+        v-if="activeStatisticTab !== 'allgemein'"
+        class="absolute right-0 top-1 flex h-8 items-center gap-3 text-sm"
+      >
+        <button
+          type="button"
+          class="font-medium transition-colors"
+          :class="pivotValueMode === 'max' ? 'text-primary' : 'text-muted hover:text-default'"
+          @click="pivotValueMode = 'max'"
         >
-          <template #objectLabel-cell="{ row }">
-            <span
-              v-if="row.original.objectKey === TOTALS_ROW_OBJECT_KEY"
-              class="text-sm font-medium"
-            >Gesamt</span>
-            <MinecraftObjectIcon
-              v-else
-              :src="findEntityIconSrc(row.original.objectKey)"
-              :alt="row.original.objectLabel"
-              kind="entity"
-            />
-          </template>
-        </UTable>
-      </template>
-    </UTabs>
+          Bestwert
+        </button>
+        <button
+          type="button"
+          class="font-medium transition-colors"
+          :class="pivotValueMode === 'total' ? 'text-primary' : 'text-muted hover:text-default'"
+          @click="pivotValueMode = 'total'"
+        >
+          Summe
+        </button>
+      </div>
+    </div>
   </UContainer>
 </template>
