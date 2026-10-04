@@ -32,6 +32,10 @@ const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/
 const statistics = computed(() => response.value?.payload ?? [])
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
+type PivotValueMode = 'max' | 'total'
+
+const pivotValueMode = ref<PivotValueMode>('max')
+
 function stripMinecraftNamespace(minecraftId: string): string {
   const namespaceSeparatorIndex = minecraftId.indexOf(':')
   return namespaceSeparatorIndex === -1 ? minecraftId : minecraftId.slice(namespaceSeparatorIndex + 1)
@@ -70,7 +74,7 @@ const generalStatisticThemeGroups = computed<GeneralStatisticThemeGroup[]>(() =>
   }
 
   for (const themeStatistics of statisticsByTheme.values()) {
-    themeStatistics.sort((a, b) => b.maxValue - a.maxValue)
+    themeStatistics.sort((a, b) => pivotValueMode.value === 'max' ? b.maxValue - a.maxValue : b.totalValue - a.totalValue)
   }
 
   const orderedThemes = [
@@ -132,15 +136,17 @@ function renderStatisticLeaderCell(slug: string, leaders: StatisticLeaderDto[], 
   ])
 }
 
-const generalStatisticTableColumns: TableColumn<StatisticListItemDto>[] = [
+const generalStatisticTableColumns = computed<TableColumn<StatisticListItemDto>[]>(() => [
   { accessorKey: 'label', header: 'Statistik', meta: { class: { th: 'w-1/2', td: 'w-1/2' } } },
   {
     id: 'leader',
-    header: '1. Platz',
+    header: pivotValueMode.value === 'max' ? '1. Platz' : 'Summe',
     meta: { class: { th: 'w-1/2', td: 'w-1/2' } },
-    cell: ({ row }) => renderStatisticLeaderCell(row.original.slug, row.original.leaders, row.original.maxDisplayValue)
+    cell: ({ row }) => pivotValueMode.value === 'max'
+      ? renderStatisticLeaderCell(row.original.slug, row.original.leaders, row.original.maxDisplayValue)
+      : h('span', { class: 'text-sm tabular-nums' }, row.original.totalDisplayValue)
   }
-]
+])
 
 function buildPivotedStatisticRows(statisticsToPivot: StatisticListItemDto[]): PivotedStatisticRow[] {
   const rowsByObjectLabel = new Map<string, PivotedStatisticRow>()
@@ -197,10 +203,6 @@ function renderSortableColumnHeader(column: SortableColumn, content: VNodeChild)
     onClick: () => column.toggleSorting()
   }, [content, h('span', { class: 'text-xs text-muted' }, sortIndicator)])
 }
-
-type PivotValueMode = 'max' | 'total'
-
-const pivotValueMode = ref<PivotValueMode>('max')
 
 function buildActionColumns(
   statisticsToPivot: StatisticListItemDto[],
@@ -417,7 +419,6 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
       </UTabs>
 
       <div
-        v-if="activeStatisticTab !== 'allgemein'"
         class="absolute right-0 top-1 flex h-8 items-center gap-3 text-sm"
       >
         <button
