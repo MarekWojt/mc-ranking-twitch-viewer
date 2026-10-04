@@ -134,6 +134,7 @@ function openParticipantDetail(_event: Event, row: { original: ObjectStatisticPa
         </h1>
       </div>
       <div class="flex flex-col items-end gap-1">
+        <DataFreshnessNote :as-of="dataAsOf" />
         <div class="flex items-center gap-3 text-sm">
           <button
             type="button"
@@ -152,7 +153,6 @@ function openParticipantDetail(_event: Event, row: { original: ObjectStatisticPa
             Punkte
           </button>
         </div>
-        <DataFreshnessNote :as-of="dataAsOf" />
       </div>
     </div>
 
