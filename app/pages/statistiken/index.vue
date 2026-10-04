@@ -85,7 +85,8 @@ const entityStatistics = computed(() =>
   filteredStatistics.value.filter(statistic => statistic.specificSubgroup === 'entities')
 )
 
-const itemsAndEntitiesTabItems = [
+const statisticTabItems = [
+  { label: 'Allgemein', value: 'allgemein', slot: 'allgemein' as const },
   { label: 'Items', value: 'items', slot: 'items' as const },
   { label: 'Entities', value: 'entities', slot: 'entities' as const }
 ]
@@ -164,20 +165,37 @@ function sortRowsByTotalValueAcrossActionsDescending(rows: PivotedStatisticRow[]
   return [...rows].sort((a, b) => b.totalValueAcrossActions - a.totalValueAcrossActions)
 }
 
-function buildActionColumns(statisticsToPivot: StatisticListItemDto[]): TableColumn<PivotedStatisticRow>[] {
+const ITEM_ACTION_ICON_BY_LABEL: Record<string, string> = {
+  'Broken': '💥',
+  'Crafted': '🛠️',
+  'Dropped': '🔻',
+  'Mined': '⛏️',
+  'Picked Up': '🔺',
+  'Used': '✋'
+}
+
+function buildActionColumns(
+  statisticsToPivot: StatisticListItemDto[],
+  resolveHeaderLabel: (actionLabel: string) => string = actionLabel => actionLabel
+): TableColumn<PivotedStatisticRow>[] {
   const actionLabels = [...new Set(
     statisticsToPivot.map(statistic => statistic.groupLabel).filter((label): label is string => label !== null)
   )].sort()
 
-  return actionLabels.map(actionLabel => ({
-    id: actionLabel,
-    header: actionLabel,
-    cell: ({ row }: { row: { original: PivotedStatisticRow } }) => {
-      const cell = row.original.cellsByActionLabel[actionLabel]
-      if (!cell) return '–'
-      return renderStatisticLeaderCell(cell.slug, cell.leaders, cell.maxDisplayValue)
+  return actionLabels.map((actionLabel) => {
+    const headerLabel = resolveHeaderLabel(actionLabel)
+    const isIconHeader = headerLabel !== actionLabel
+
+    return {
+      id: actionLabel,
+      header: () => h('span', { title: actionLabel, class: isIconHeader ? 'text-lg' : undefined }, headerLabel),
+      cell: ({ row }: { row: { original: PivotedStatisticRow } }) => {
+        const cell = row.original.cellsByActionLabel[actionLabel]
+        if (!cell) return '–'
+        return renderStatisticLeaderCell(cell.slug, cell.leaders, cell.maxDisplayValue)
+      }
     }
-  }))
+  })
 }
 
 const totalValueAcrossActionsColumn: TableColumn<PivotedStatisticRow> = {
@@ -191,7 +209,7 @@ const itemPivotRows = computed(() =>
 )
 const itemPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
   { accessorKey: 'objectLabel', header: 'Objekt' },
-  ...buildActionColumns(itemStatistics.value),
+  ...buildActionColumns(itemStatistics.value, actionLabel => ITEM_ACTION_ICON_BY_LABEL[actionLabel] ?? actionLabel),
   totalValueAcrossActionsColumn
 ])
 
@@ -206,7 +224,7 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
 </script>
 
 <template>
-  <UContainer class="py-10 space-y-10">
+  <UContainer class="py-10 space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-semibold">
         Statistiken
@@ -221,58 +239,60 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
       </div>
     </div>
 
-    <section class="space-y-6">
-      <h2 class="text-lg font-medium">
-        Allgemein
-      </h2>
-      <div
-        v-for="themeGroup in generalStatisticThemeGroups"
-        :key="themeGroup.theme"
-        class="space-y-3"
-      >
-        <h3 class="text-sm font-medium text-muted">
-          {{ themeGroup.theme }}
-        </h3>
+    <UTabs
+      :items="statisticTabItems"
+      default-value="allgemein"
+      variant="link"
+      :ui="{ content: 'mt-6' }"
+    >
+      <template #allgemein>
+        <div class="space-y-6">
+          <div
+            v-for="themeGroup in generalStatisticThemeGroups"
+            :key="themeGroup.theme"
+            class="space-y-3"
+          >
+            <h3 class="text-sm font-medium text-muted">
+              {{ themeGroup.theme }}
+            </h3>
+            <UTable
+              :data="themeGroup.statistics"
+              :columns="generalStatisticTableColumns"
+              @select="openStatisticDetail"
+            />
+          </div>
+        </div>
+      </template>
+
+      <template #items>
         <UTable
-          :data="themeGroup.statistics"
-          :columns="generalStatisticTableColumns"
-          @select="openStatisticDetail"
-        />
-      </div>
-    </section>
+          :data="itemPivotRows"
+          :columns="itemPivotColumns"
+        >
+          <template #objectLabel-cell="{ row }">
+            <MinecraftObjectIcon
+              :src="findItemIconSrc(row.original.objectKey)"
+              :alt="row.original.objectLabel"
+              kind="item"
+            />
+          </template>
+        </UTable>
+      </template>
 
-    <section class="space-y-3">
-      <UTabs :items="itemsAndEntitiesTabItems">
-        <template #items>
-          <UTable
-            :data="itemPivotRows"
-            :columns="itemPivotColumns"
-          >
-            <template #objectLabel-cell="{ row }">
-              <MinecraftObjectIcon
-                :src="findItemIconSrc(row.original.objectKey)"
-                :alt="row.original.objectLabel"
-                kind="item"
-              />
-            </template>
-          </UTable>
-        </template>
-
-        <template #entities>
-          <UTable
-            :data="entityPivotRows"
-            :columns="entityPivotColumns"
-          >
-            <template #objectLabel-cell="{ row }">
-              <MinecraftObjectIcon
-                :src="findEntityIconSrc(row.original.objectKey)"
-                :alt="row.original.objectLabel"
-                kind="entity"
-              />
-            </template>
-          </UTable>
-        </template>
-      </UTabs>
-    </section>
+      <template #entities>
+        <UTable
+          :data="entityPivotRows"
+          :columns="entityPivotColumns"
+        >
+          <template #objectLabel-cell="{ row }">
+            <MinecraftObjectIcon
+              :src="findEntityIconSrc(row.original.objectKey)"
+              :alt="row.original.objectLabel"
+              kind="entity"
+            />
+          </template>
+        </UTable>
+      </template>
+    </UTabs>
   </UContainer>
 </template>
