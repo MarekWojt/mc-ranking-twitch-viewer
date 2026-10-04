@@ -66,3 +66,18 @@ export interface MinecraftIconBundleDto {
   itemIconsByBareId: Record<string, string>
   entityIconsByBareId: Record<string, string>
 }
+
+export interface ObjectStatisticParticipantRowDto {
+  participantId: string
+  displayName: string
+  minecraftUuid: string
+  valueByActionLabel: Record<string, number>
+  displayValueByActionLabel: Record<string, string>
+  totalValue: number
+}
+
+export interface ObjectStatisticDetailDto {
+  objectKey: string
+  objectLabel: string
+  participants: ObjectStatisticParticipantRowDto[]
+}

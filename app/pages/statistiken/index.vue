@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import type { VNodeChild } from 'vue'
 
 interface PivotedActionCell {
-  slug: string
   maxValue: number
   maxDisplayValue: string
   totalValue: number
@@ -35,11 +33,6 @@ const dataAsOf = computed(() => response.value?.asOf ?? null)
 type PivotValueMode = 'max' | 'total'
 
 const pivotValueMode = ref<PivotValueMode>('max')
-
-function stripMinecraftNamespace(minecraftId: string): string {
-  const namespaceSeparatorIndex = minecraftId.indexOf(':')
-  return namespaceSeparatorIndex === -1 ? minecraftId : minecraftId.slice(namespaceSeparatorIndex + 1)
-}
 
 function findItemIconSrc(minecraftKey: string): string | null {
   return iconBundle.value?.itemIconsByBareId[stripMinecraftNamespace(minecraftKey)] ?? null
@@ -105,19 +98,32 @@ function openStatisticDetail(_event: Event, row: { original: StatisticListItemDt
   navigateTo(`/statistiken/${row.original.slug}`)
 }
 
-function renderStatisticLeaderCell(slug: string, leaders: StatisticLeaderDto[], displayValue: string) {
+function openItemDetail(_event: Event, row: { original: PivotedStatisticRow }) {
+  if (row.original.objectKey === TOTALS_ROW_OBJECT_KEY) return
+  navigateTo(`/statistiken/items/${stripMinecraftNamespace(row.original.objectKey)}`)
+}
+
+function openEntityDetail(_event: Event, row: { original: PivotedStatisticRow }) {
+  if (row.original.objectKey === TOTALS_ROW_OBJECT_KEY) return
+  navigateTo(`/statistiken/entities/${stripMinecraftNamespace(row.original.objectKey)}`)
+}
+
+function renderStatisticLeaderCell(slug: string | null, leaders: StatisticLeaderDto[], displayValue: string) {
   if (leaders.length === 0) return '–'
 
   const allLeaderNames = leaders.map(leader => leader.displayName).join(', ')
+  const isClickable = slug !== null
 
-  return h('button', {
-    type: 'button',
-    class: 'flex shrink-0 items-center gap-1.5 hover:opacity-80',
+  function handleClick(event: MouseEvent) {
+    event.stopPropagation()
+    navigateTo(`/statistiken/${slug}`)
+  }
+
+  return h(isClickable ? 'button' : 'span', {
+    type: isClickable ? 'button' : undefined,
+    class: `flex shrink-0 items-center gap-1.5${isClickable ? ' hover:opacity-80' : ''}`,
     title: allLeaderNames,
-    onClick: (event: MouseEvent) => {
-      event.stopPropagation()
-      navigateTo(`/statistiken/${slug}`)
-    }
+    onClick: isClickable ? handleClick : undefined
   }, [
     h('div', { class: 'flex shrink-0 flex-wrap gap-1 max-w-20' }, leaders.map(leader =>
       h('img', {
@@ -157,7 +163,6 @@ function buildPivotedStatisticRows(statisticsToPivot: StatisticListItemDto[]): P
     const row = rowsByObjectLabel.get(statistic.label)
       ?? { objectKey: statistic.key, objectLabel: statistic.label, cellsByActionLabel: {}, maxValueAcrossActions: 0, totalValueAcrossActions: 0 }
     row.cellsByActionLabel[statistic.groupLabel] = {
-      slug: statistic.slug,
       maxValue: statistic.maxValue,
       maxDisplayValue: statistic.maxDisplayValue,
       totalValue: statistic.totalValue,
@@ -177,33 +182,6 @@ function buildPivotedStatisticRows(statisticsToPivot: StatisticListItemDto[]): P
   return [...rowsByObjectLabel.values()]
 }
 
-const ITEM_ACTION_ICON_BY_LABEL: Record<string, string> = {
-  'Broken': '💥',
-  'Crafted': '🛠️',
-  'Dropped': '🔻',
-  'Mined': '⛏️',
-  'Picked Up': '🔺',
-  'Used': '✋'
-}
-
-const ENTITY_ACTION_ICON_BY_LABEL: Record<string, string> = {
-  'Killed': '🔪',
-  'Killed By': '☠️'
-}
-
-type SortableColumn = { getIsSorted: () => false | 'asc' | 'desc', toggleSorting: () => void }
-
-function renderSortableColumnHeader(column: SortableColumn, content: VNodeChild) {
-  const sortDirection = column.getIsSorted()
-  const sortIndicator = sortDirection === 'asc' ? '↑' : sortDirection === 'desc' ? '↓' : '↕'
-
-  return h('button', {
-    type: 'button',
-    class: 'inline-flex items-center gap-1 hover:text-highlighted',
-    onClick: () => column.toggleSorting()
-  }, [content, h('span', { class: 'text-xs text-muted' }, sortIndicator)])
-}
-
 function buildActionColumns(
   statisticsToPivot: StatisticListItemDto[],
   resolveHeaderIcon: (actionLabel: string) => string | null = () => null
@@ -215,9 +193,7 @@ function buildActionColumns(
 
   return actionLabels.map((actionLabel) => {
     const headerIcon = resolveHeaderIcon(actionLabel)
-    const headerContent = h('span', { title: actionLabel, class: 'inline-flex items-center gap-1' }, headerIcon
-      ? [h('span', { class: 'text-lg' }, headerIcon), h('span', {}, actionLabel)]
-      : actionLabel)
+    const headerContent = renderActionColumnHeaderContent(actionLabel, headerIcon)
 
     return {
       id: actionLabel,
@@ -236,7 +212,7 @@ function buildActionColumns(
             : h('span', { class: 'text-sm tabular-nums' }, cell.totalDisplayValue)
         }
         if (row.original.objectKey === TOTALS_ROW_OBJECT_KEY) return renderBoldTabularNumber(cell.maxValue)
-        return renderStatisticLeaderCell(cell.slug, cell.leaders, cell.maxDisplayValue)
+        return renderStatisticLeaderCell(null, cell.leaders, cell.maxDisplayValue)
       }
     }
   })
@@ -252,10 +228,6 @@ function buildTotalValueAcrossActionsColumn(): TableColumn<PivotedStatisticRow> 
     cell: ({ row }: { row: { original: PivotedStatisticRow } }) =>
       renderBoldTabularNumber(valueMode === 'max' ? row.original.maxValueAcrossActions : row.original.totalValueAcrossActions)
   }
-}
-
-function renderBoldTabularNumber(value: number) {
-  return h('span', { class: 'text-sm tabular-nums font-medium' }, value.toLocaleString('de-DE'))
 }
 
 const TOTALS_ROW_OBJECT_KEY = '__totals__'
@@ -284,7 +256,6 @@ function buildTotalsRow(statisticsToPivot: StatisticListItemDto[]): PivotedStati
         const maxValue = maxValueSumByActionLabel[actionLabel]!
         const totalValue = totalValueSumByActionLabel[actionLabel]!
         return [actionLabel, {
-          slug: '',
           maxValue,
           maxDisplayValue: maxValue.toLocaleString('de-DE'),
           totalValue,
@@ -377,6 +348,7 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
             :get-row-id="(row: PivotedStatisticRow) => row.objectKey"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
             :initial-state="pivotTableInitialState"
+            @select="openItemDetail"
           >
             <template #objectLabel-cell="{ row }">
               <span
@@ -401,6 +373,7 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
             :get-row-id="(row: PivotedStatisticRow) => row.objectKey"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
             :initial-state="pivotTableInitialState"
+            @select="openEntityDetail"
           >
             <template #objectLabel-cell="{ row }">
               <span
