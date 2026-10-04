@@ -14,12 +14,16 @@ export default defineEventHandler(async (event): Promise<DataWithFreshness<Stati
       return {
         participantId: scoredParticipant.participant.id,
         displayName: scoredParticipant.participant.displayName,
+        minecraftUuid: scoredParticipant.participant.minecraftUuid,
         value: score?.value ?? 0,
         displayValue: formatStatisticDisplayValue(statisticDefinition.key, score?.value ?? 0),
         points: score?.points ?? 0
       }
     })
     .sort((a, b) => b.points - a.points)
+
+  const totalValue = participantRows.reduce((sum, row) => sum + row.value, 0)
+  const totalPoints = participantRows.reduce((sum, row) => sum + row.points, 0)
 
   return {
     asOf: scoreboard.asOf,
@@ -28,6 +32,9 @@ export default defineEventHandler(async (event): Promise<DataWithFreshness<Stati
       label: statisticDefinition.label,
       group: statisticDefinition.group,
       groupLabel: statisticDefinition.groupLabel,
+      totalValue,
+      totalDisplayValue: formatStatisticDisplayValue(statisticDefinition.key, totalValue),
+      totalPoints,
       participants: participantRows
     }
   }

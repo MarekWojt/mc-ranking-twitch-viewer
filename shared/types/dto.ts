@@ -49,6 +49,7 @@ export interface StatisticListItemDto {
 export interface StatisticParticipantRowDto {
   participantId: string
   displayName: string
+  minecraftUuid: string
   value: number
   displayValue: string
   points: number
@@ -59,6 +60,9 @@ export interface StatisticDetailDto {
   label: string
   group: StatisticGroup
   groupLabel: string | null
+  totalValue: number
+  totalDisplayValue: string
+  totalPoints: number
   participants: StatisticParticipantRowDto[]
 }
 

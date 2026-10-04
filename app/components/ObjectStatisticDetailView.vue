@@ -35,6 +35,8 @@ const actionLabels = computed(() => {
   return [...labels].sort()
 })
 
+const TOTALS_ROW_PARTICIPANT_ID = '__totals__'
+
 const tableColumns = computed<TableColumn<ObjectStatisticParticipantRowDto>[]>(() => [
   { accessorKey: 'displayName', header: 'Spieler', enableSorting: false },
   ...actionLabels.value.map((actionLabel): TableColumn<ObjectStatisticParticipantRowDto> => ({
@@ -44,6 +46,7 @@ const tableColumns = computed<TableColumn<ObjectStatisticParticipantRowDto>[]>((
       renderSortableColumnHeader(column, renderActionColumnHeaderContent(actionLabel, actionIconByLabel.value[actionLabel] ?? null)),
     cell: ({ row }: { row: { original: ObjectStatisticParticipantRowDto } }) => {
       const value = row.original.valueByActionLabel[actionLabel] ?? 0
+      if (row.original.participantId === TOTALS_ROW_PARTICIPANT_ID) return renderBoldTabularNumber(value)
       if (value === 0) return '–'
       return h('span', { class: 'text-sm tabular-nums' }, row.original.displayValueByActionLabel[actionLabel] ?? value.toLocaleString('de-DE'))
     }
@@ -58,7 +61,35 @@ const tableColumns = computed<TableColumn<ObjectStatisticParticipantRowDto>[]>((
 
 const tableInitialState = { sorting: [{ id: 'totalValue', desc: true }] }
 
+const participantRows = computed<ObjectStatisticParticipantRowDto[]>(() => {
+  if (!detail.value) return []
+
+  const valueByActionLabel: Record<string, number> = {}
+  for (const actionLabel of actionLabels.value) {
+    valueByActionLabel[actionLabel] = detail.value.participants.reduce((sum, participant) => sum + (participant.valueByActionLabel[actionLabel] ?? 0), 0)
+  }
+
+  const totalsRow: ObjectStatisticParticipantRowDto = {
+    participantId: TOTALS_ROW_PARTICIPANT_ID,
+    displayName: 'Gesamt',
+    minecraftUuid: '',
+    valueByActionLabel,
+    displayValueByActionLabel: {},
+    totalValue: Object.values(valueByActionLabel).reduce((sum, value) => sum + value, 0)
+  }
+
+  return [totalsRow, ...detail.value.participants]
+})
+
+const participantTableRowMeta = {
+  class: {
+    tr: (row: { original: ObjectStatisticParticipantRowDto }) =>
+      row.original.participantId === TOTALS_ROW_PARTICIPANT_ID ? 'border-b-2 border-default' : ''
+  }
+}
+
 function openParticipantDetail(_event: Event, row: { original: ObjectStatisticParticipantRowDto }) {
+  if (row.original.participantId === TOTALS_ROW_PARTICIPANT_ID) return
   navigateTo(`/teilnehmer/${row.original.participantId}`)
 }
 </script>
@@ -83,13 +114,32 @@ function openParticipantDetail(_event: Event, row: { original: ObjectStatisticPa
     </div>
 
     <UTable
-      :data="detail.participants"
+      :data="participantRows"
       :columns="tableColumns"
+      :meta="participantTableRowMeta"
+      :get-row-id="(row: ObjectStatisticParticipantRowDto) => row.participantId"
+      :row-pinning="{ top: [TOTALS_ROW_PARTICIPANT_ID] }"
       :initial-state="tableInitialState"
       @select="openParticipantDetail"
     >
       <template #displayName-cell="{ row }">
-        <span class="font-medium">{{ row.original.displayName }}</span>
+        <span
+          v-if="row.original.participantId === TOTALS_ROW_PARTICIPANT_ID"
+          class="font-medium"
+        >Gesamt</span>
+        <div
+          v-else
+          class="flex items-center gap-2"
+        >
+          <img
+            :src="buildMinecraftAvatarRenderUrl(row.original.minecraftUuid, 'avatar')"
+            :alt="row.original.displayName"
+            class="size-6 rounded"
+            loading="lazy"
+            @error="(event: Event) => { (event.target as HTMLImageElement).style.display = 'none' }"
+          >
+          <span class="font-medium">{{ row.original.displayName }}</span>
+        </div>
       </template>
     </UTable>
   </UContainer>
