@@ -174,21 +174,27 @@ const ITEM_ACTION_ICON_BY_LABEL: Record<string, string> = {
   'Used': '✋'
 }
 
+const ENTITY_ACTION_ICON_BY_LABEL: Record<string, string> = {
+  'Killed': '🔪',
+  'Killed By': '☠️'
+}
+
 function buildActionColumns(
   statisticsToPivot: StatisticListItemDto[],
-  resolveHeaderLabel: (actionLabel: string) => string = actionLabel => actionLabel
+  resolveHeaderIcon: (actionLabel: string) => string | null = () => null
 ): TableColumn<PivotedStatisticRow>[] {
   const actionLabels = [...new Set(
     statisticsToPivot.map(statistic => statistic.groupLabel).filter((label): label is string => label !== null)
   )].sort()
 
   return actionLabels.map((actionLabel) => {
-    const headerLabel = resolveHeaderLabel(actionLabel)
-    const isIconHeader = headerLabel !== actionLabel
+    const headerIcon = resolveHeaderIcon(actionLabel)
 
     return {
       id: actionLabel,
-      header: () => h('span', { title: actionLabel, class: isIconHeader ? 'text-lg' : undefined }, headerLabel),
+      header: () => h('span', { title: actionLabel, class: 'inline-flex items-center gap-1' }, headerIcon
+        ? [h('span', { class: 'text-lg' }, headerIcon), h('span', {}, actionLabel)]
+        : actionLabel),
       cell: ({ row }: { row: { original: PivotedStatisticRow } }) => {
         const cell = row.original.cellsByActionLabel[actionLabel]
         if (!cell) return '–'
@@ -209,7 +215,7 @@ const itemPivotRows = computed(() =>
 )
 const itemPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
   { accessorKey: 'objectLabel', header: 'Objekt' },
-  ...buildActionColumns(itemStatistics.value, actionLabel => ITEM_ACTION_ICON_BY_LABEL[actionLabel] ?? actionLabel),
+  ...buildActionColumns(itemStatistics.value, actionLabel => ITEM_ACTION_ICON_BY_LABEL[actionLabel] ?? null),
   totalValueAcrossActionsColumn
 ])
 
@@ -218,7 +224,7 @@ const entityPivotRows = computed(() =>
 )
 const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
   { accessorKey: 'objectLabel', header: 'Objekt' },
-  ...buildActionColumns(entityStatistics.value),
+  ...buildActionColumns(entityStatistics.value, actionLabel => ENTITY_ACTION_ICON_BY_LABEL[actionLabel] ?? null),
   totalValueAcrossActionsColumn
 ])
 </script>
