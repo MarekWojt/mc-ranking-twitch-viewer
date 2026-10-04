@@ -72,6 +72,10 @@ function parsePivotSortingFromQuery(queryValue: unknown): { id: string, desc: bo
 
 const pivotSorting = ref(parsePivotSortingFromQuery(route.query.sortierung))
 
+watch(pivotSorting, (sorting) => {
+  if (sorting.length === 0) pivotSorting.value = DEFAULT_PIVOT_SORTING // clicking a sorted column a third time clears it; fall back to the default instead of leaving the table unsorted
+})
+
 watch([pivotValueMode, pivotSorting], () => {
   const query = currentQueryOverrides()
   const sortEntry = pivotSorting.value[0]
