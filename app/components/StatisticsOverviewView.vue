@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
+const props = defineProps<{
+  activeTab: 'allgemein' | 'items' | 'entities'
+}>()
+
 interface PivotedActionCell {
   maxValue: number
   maxDisplayValue: string
@@ -21,6 +25,17 @@ interface PivotedStatisticRow {
   maxValueAcrossActions: number
   totalValueAcrossActions: number
 }
+
+const statisticTabItems = [
+  { label: 'Allgemein', value: 'allgemein', slot: 'allgemein' as const },
+  { label: 'Items', value: 'items', slot: 'items' as const },
+  { label: 'Entities', value: 'entities', slot: 'entities' as const }
+]
+
+const activeStatisticTab = computed({
+  get: () => props.activeTab,
+  set: (newTab: string) => navigateTo(`/statistiken/${newTab}`)
+})
 
 const { data: response, refresh } = await useFetch<DataWithFreshness<StatisticListItemDto[]>>('/api/statistics')
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
@@ -85,14 +100,6 @@ const itemStatistics = computed(() =>
 const entityStatistics = computed(() =>
   filteredStatistics.value.filter(statistic => statistic.specificSubgroup === 'entities')
 )
-
-const statisticTabItems = [
-  { label: 'Allgemein', value: 'allgemein', slot: 'allgemein' as const },
-  { label: 'Items', value: 'items', slot: 'items' as const },
-  { label: 'Entities', value: 'entities', slot: 'entities' as const }
-]
-
-const activeStatisticTab = ref<string>('allgemein')
 
 function openStatisticDetail(_event: Event, row: { original: StatisticListItemDto }) {
   navigateTo(`/statistiken/${row.original.slug}`)

@@ -26,6 +26,10 @@ export default defineNuxtConfig({
     }
   },
 
+  routeRules: {
+    '/statistiken': { redirect: '/statistiken/allgemein' }
+  },
+
   compatibilityDate: '2026-06-30',
 
   eslint: {
