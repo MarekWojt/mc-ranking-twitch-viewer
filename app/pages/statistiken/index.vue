@@ -198,6 +198,7 @@ function buildActionColumns(
       cell: ({ row }: { row: { original: PivotedStatisticRow } }) => {
         const cell = row.original.cellsByActionLabel[actionLabel]
         if (!cell) return '–'
+        if (row.original.objectKey === TOTALS_ROW_OBJECT_KEY) return renderBoldTabularNumber(cell.maxValue)
         return renderStatisticLeaderCell(cell.slug, cell.leaders, cell.maxDisplayValue)
       }
     }
@@ -207,21 +208,55 @@ function buildActionColumns(
 const totalValueAcrossActionsColumn: TableColumn<PivotedStatisticRow> = {
   id: 'totalValueAcrossActions',
   header: 'Gesamt',
-  cell: ({ row }) => h('span', { class: 'text-sm tabular-nums font-medium' }, row.original.totalValueAcrossActions.toLocaleString('de-DE'))
+  cell: ({ row }) => renderBoldTabularNumber(row.original.totalValueAcrossActions)
 }
 
-const itemPivotRows = computed(() =>
-  sortRowsByTotalValueAcrossActionsDescending(buildPivotedStatisticRows(itemStatistics.value))
-)
+function renderBoldTabularNumber(value: number) {
+  return h('span', { class: 'text-sm tabular-nums font-medium' }, value.toLocaleString('de-DE'))
+}
+
+const TOTALS_ROW_OBJECT_KEY = '__totals__'
+
+const pivotTableRowMeta = {
+  class: {
+    tr: (row: { original: PivotedStatisticRow }) =>
+      row.original.objectKey === TOTALS_ROW_OBJECT_KEY ? 'border-b-2 border-default' : ''
+  }
+}
+
+function buildTotalsRow(statisticsToPivot: StatisticListItemDto[]): PivotedStatisticRow {
+  const totalByActionLabel: Record<string, number> = {}
+  for (const statistic of statisticsToPivot) {
+    if (statistic.groupLabel === null) continue
+    totalByActionLabel[statistic.groupLabel] = (totalByActionLabel[statistic.groupLabel] ?? 0) + statistic.maxValue
+  }
+
+  return {
+    objectKey: TOTALS_ROW_OBJECT_KEY,
+    objectLabel: 'Gesamt',
+    cellsByActionLabel: Object.fromEntries(
+      Object.entries(totalByActionLabel).map(([actionLabel, value]) =>
+        [actionLabel, { slug: '', maxValue: value, maxDisplayValue: value.toLocaleString('de-DE'), leaders: [] }]
+      )
+    ),
+    totalValueAcrossActions: Object.values(totalByActionLabel).reduce((sum, value) => sum + value, 0)
+  }
+}
+
+const itemPivotRows = computed(() => [
+  buildTotalsRow(itemStatistics.value),
+  ...sortRowsByTotalValueAcrossActionsDescending(buildPivotedStatisticRows(itemStatistics.value))
+])
 const itemPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
   { accessorKey: 'objectLabel', header: 'Objekt' },
   ...buildActionColumns(itemStatistics.value, actionLabel => ITEM_ACTION_ICON_BY_LABEL[actionLabel] ?? null),
   totalValueAcrossActionsColumn
 ])
 
-const entityPivotRows = computed(() =>
-  sortRowsByTotalValueAcrossActionsDescending(buildPivotedStatisticRows(entityStatistics.value))
-)
+const entityPivotRows = computed(() => [
+  buildTotalsRow(entityStatistics.value),
+  ...sortRowsByTotalValueAcrossActionsDescending(buildPivotedStatisticRows(entityStatistics.value))
+])
 const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
   { accessorKey: 'objectLabel', header: 'Objekt' },
   ...buildActionColumns(entityStatistics.value, actionLabel => ENTITY_ACTION_ICON_BY_LABEL[actionLabel] ?? null),
@@ -274,9 +309,15 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
         <UTable
           :data="itemPivotRows"
           :columns="itemPivotColumns"
+          :meta="pivotTableRowMeta"
         >
           <template #objectLabel-cell="{ row }">
+            <span
+              v-if="row.original.objectKey === TOTALS_ROW_OBJECT_KEY"
+              class="text-sm font-medium"
+            >Gesamt</span>
             <MinecraftObjectIcon
+              v-else
               :src="findItemIconSrc(row.original.objectKey)"
               :alt="row.original.objectLabel"
               kind="item"
@@ -289,9 +330,15 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
         <UTable
           :data="entityPivotRows"
           :columns="entityPivotColumns"
+          :meta="pivotTableRowMeta"
         >
           <template #objectLabel-cell="{ row }">
+            <span
+              v-if="row.original.objectKey === TOTALS_ROW_OBJECT_KEY"
+              class="text-sm font-medium"
+            >Gesamt</span>
             <MinecraftObjectIcon
+              v-else
               :src="findEntityIconSrc(row.original.objectKey)"
               :alt="row.original.objectLabel"
               kind="entity"
