@@ -97,7 +97,6 @@ function openStatisticDetail(_event: Event, row: { original: StatisticListItemDt
 function renderStatisticLeaderCell(slug: string, leaders: StatisticLeaderDto[], displayValue: string) {
   if (leaders.length === 0) return '–'
 
-  const primaryLeader = leaders[0]!
   const allLeaderNames = leaders.map(leader => leader.displayName).join(', ')
 
   return h('button', {
@@ -109,15 +108,19 @@ function renderStatisticLeaderCell(slug: string, leaders: StatisticLeaderDto[], 
       navigateTo(`/statistiken/${slug}`)
     }
   }, [
-    h('img', {
-      src: buildMinecraftAvatarRenderUrl(primaryLeader.minecraftUuid, 'avatar'),
-      alt: allLeaderNames,
-      class: 'size-6 rounded',
-      loading: 'lazy',
-      onError: (event: Event) => {
-        (event.target as HTMLImageElement).style.display = 'none'
-      }
-    }),
+    h('div', { class: 'flex flex-wrap gap-1 max-w-20' }, leaders.map(leader =>
+      h('img', {
+        key: leader.minecraftUuid,
+        src: buildMinecraftAvatarRenderUrl(leader.minecraftUuid, 'avatar'),
+        alt: leader.displayName,
+        title: leader.displayName,
+        class: 'size-6 rounded',
+        loading: 'lazy',
+        onError: (event: Event) => {
+          (event.target as HTMLImageElement).style.display = 'none'
+        }
+      })
+    )),
     h('span', { class: 'text-sm tabular-nums' }, displayValue)
   ])
 }
