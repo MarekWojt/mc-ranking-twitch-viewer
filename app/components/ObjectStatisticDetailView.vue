@@ -37,36 +37,57 @@ const actionLabels = computed(() => {
 
 const TOTALS_ROW_PARTICIPANT_ID = '__totals__'
 
-const tableColumns = computed<TableColumn<ObjectStatisticParticipantRowDto>[]>(() => [
-  { accessorKey: 'displayName', header: 'Spieler', enableSorting: false },
-  ...actionLabels.value.map((actionLabel): TableColumn<ObjectStatisticParticipantRowDto> => ({
-    id: actionLabel,
-    accessorFn: (row: ObjectStatisticParticipantRowDto) => row.valueByActionLabel[actionLabel] ?? 0,
-    header: ({ column }: { column: SortableColumn }) =>
-      renderSortableColumnHeader(column, renderActionColumnHeaderContent(actionLabel, actionIconByLabel.value[actionLabel] ?? null)),
-    cell: ({ row }: { row: { original: ObjectStatisticParticipantRowDto } }) => {
-      const value = row.original.valueByActionLabel[actionLabel] ?? 0
-      if (row.original.participantId === TOTALS_ROW_PARTICIPANT_ID) return renderBoldTabularNumber(value)
-      if (value === 0) return '–'
-      return h('span', { class: 'text-sm tabular-nums' }, row.original.displayValueByActionLabel[actionLabel] ?? value.toLocaleString('de-DE'))
-    }
-  })),
-  {
-    id: 'totalValue',
-    accessorKey: 'totalValue',
-    header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, 'Gesamt'),
-    cell: ({ row }) => renderBoldTabularNumber(row.original.totalValue)
-  }
-])
+type StatDisplayMode = 'value' | 'points'
 
-const tableInitialState = { sorting: [{ id: 'totalValue', desc: true }] }
+const statDisplayMode = ref<StatDisplayMode>('value')
+
+const tableColumns = computed<TableColumn<ObjectStatisticParticipantRowDto>[]>(() => {
+  const displayMode = statDisplayMode.value
+
+  return [
+    { accessorKey: 'displayName', header: 'Spieler', enableSorting: false },
+    ...actionLabels.value.map((actionLabel): TableColumn<ObjectStatisticParticipantRowDto> => ({
+      id: actionLabel,
+      accessorFn: (row: ObjectStatisticParticipantRowDto) =>
+        displayMode === 'value' ? (row.valueByActionLabel[actionLabel] ?? 0) : (row.pointsByActionLabel[actionLabel] ?? 0),
+      header: ({ column }: { column: SortableColumn }) =>
+        renderSortableColumnHeader(column, renderActionColumnHeaderContent(actionLabel, actionIconByLabel.value[actionLabel] ?? null)),
+      cell: ({ row }: { row: { original: ObjectStatisticParticipantRowDto } }) => {
+        const isTotalsRow = row.original.participantId === TOTALS_ROW_PARTICIPANT_ID
+
+        if (displayMode === 'points') {
+          const points = Math.round(row.original.pointsByActionLabel[actionLabel] ?? 0)
+          if (!isTotalsRow && points === 0) return '–'
+          return isTotalsRow ? renderBoldTabularNumber(points) : h('span', { class: 'text-sm tabular-nums' }, points.toLocaleString('de-DE'))
+        }
+
+        const value = row.original.valueByActionLabel[actionLabel] ?? 0
+        if (isTotalsRow) return renderBoldTabularNumber(value)
+        if (value === 0) return '–'
+        return h('span', { class: 'text-sm tabular-nums' }, row.original.displayValueByActionLabel[actionLabel] ?? value.toLocaleString('de-DE'))
+      }
+    })),
+    {
+      id: 'total',
+      accessorFn: (row: ObjectStatisticParticipantRowDto) => displayMode === 'value' ? row.totalValue : row.totalPoints,
+      header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, 'Gesamt'),
+      cell: ({ row }) => renderBoldTabularNumber(displayMode === 'value' ? row.original.totalValue : Math.round(row.original.totalPoints))
+    }
+  ]
+})
+
+const tableInitialState = { sorting: [{ id: 'total', desc: true }] }
 
 const participantRows = computed<ObjectStatisticParticipantRowDto[]>(() => {
+  void statDisplayMode.value // force a fresh data reference on toggle so the table's sorted row model re-runs, not just the columns
+
   if (!detail.value) return []
 
   const valueByActionLabel: Record<string, number> = {}
+  const pointsByActionLabel: Record<string, number> = {}
   for (const actionLabel of actionLabels.value) {
     valueByActionLabel[actionLabel] = detail.value.participants.reduce((sum, participant) => sum + (participant.valueByActionLabel[actionLabel] ?? 0), 0)
+    pointsByActionLabel[actionLabel] = detail.value.participants.reduce((sum, participant) => sum + (participant.pointsByActionLabel[actionLabel] ?? 0), 0)
   }
 
   const totalsRow: ObjectStatisticParticipantRowDto = {
@@ -75,7 +96,9 @@ const participantRows = computed<ObjectStatisticParticipantRowDto[]>(() => {
     minecraftUuid: '',
     valueByActionLabel,
     displayValueByActionLabel: {},
-    totalValue: Object.values(valueByActionLabel).reduce((sum, value) => sum + value, 0)
+    totalValue: Object.values(valueByActionLabel).reduce((sum, value) => sum + value, 0),
+    pointsByActionLabel,
+    totalPoints: Object.values(pointsByActionLabel).reduce((sum, points) => sum + points, 0)
   }
 
   return [totalsRow, ...detail.value.participants]
@@ -110,7 +133,27 @@ function openParticipantDetail(_event: Event, row: { original: ObjectStatisticPa
           {{ detail.objectLabel }}
         </h1>
       </div>
-      <DataFreshnessNote :as-of="dataAsOf" />
+      <div class="flex flex-col items-end gap-1">
+        <div class="flex items-center gap-3 text-sm">
+          <button
+            type="button"
+            class="font-medium transition-colors"
+            :class="statDisplayMode === 'value' ? 'text-primary' : 'text-muted hover:text-default'"
+            @click="statDisplayMode = 'value'"
+          >
+            Wert
+          </button>
+          <button
+            type="button"
+            class="font-medium transition-colors"
+            :class="statDisplayMode === 'points' ? 'text-primary' : 'text-muted hover:text-default'"
+            @click="statDisplayMode = 'points'"
+          >
+            Punkte
+          </button>
+        </div>
+        <DataFreshnessNote :as-of="dataAsOf" />
+      </div>
     </div>
 
     <UTable

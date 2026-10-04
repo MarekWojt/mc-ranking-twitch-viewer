@@ -15,14 +15,19 @@ export async function buildObjectStatisticDetail(
   const participants = scoreboard.participants.map(({ participant, statistics }) => {
     const valueByActionLabel: Record<string, number> = {}
     const displayValueByActionLabel: Record<string, string> = {}
+    const pointsByActionLabel: Record<string, number> = {}
     let totalValue = 0
+    let totalPoints = 0
 
     for (const definition of matchingDefinitions) {
       const actionLabel = definition.groupLabel!
-      const value = statistics.find(entry => entry.statistic.slug === definition.slug)?.value ?? 0
+      const score = statistics.find(entry => entry.statistic.slug === definition.slug)
+      const value = score?.value ?? 0
       valueByActionLabel[actionLabel] = value
       displayValueByActionLabel[actionLabel] = formatStatisticDisplayValue(definition.key, value)
       totalValue += value
+      pointsByActionLabel[actionLabel] = score?.points ?? 0
+      totalPoints += score?.points ?? 0
     }
 
     return {
@@ -31,7 +36,9 @@ export async function buildObjectStatisticDetail(
       minecraftUuid: participant.minecraftUuid,
       valueByActionLabel,
       displayValueByActionLabel,
-      totalValue
+      totalValue,
+      pointsByActionLabel,
+      totalPoints
     }
   })
 

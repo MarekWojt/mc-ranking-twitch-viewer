@@ -78,6 +78,8 @@ export interface ObjectStatisticParticipantRowDto {
   valueByActionLabel: Record<string, number>
   displayValueByActionLabel: Record<string, string>
   totalValue: number
+  pointsByActionLabel: Record<string, number>
+  totalPoints: number
 }
 
 export interface ObjectStatisticDetailDto {
