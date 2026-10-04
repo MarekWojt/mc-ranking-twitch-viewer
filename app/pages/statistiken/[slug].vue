@@ -33,7 +33,7 @@ function openParticipantDetail(_event: Event, row: { original: StatisticParticip
   >
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-semibold">
-        <span v-if="statistic.groupLabel">{{ statistic.groupLabel }}: </span>{{ statistic.label }}
+        {{ statistic.label }}
       </h1>
       <DataFreshnessNote :as-of="dataAsOf" />
     </div>

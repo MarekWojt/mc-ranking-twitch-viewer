@@ -15,12 +15,14 @@ const CENTIMETER_BASED_STATISTIC_KEYS = new Set([
   'minecraft:fall_one_cm',
   'minecraft:climb_one_cm',
   'minecraft:fly_one_cm',
+  'minecraft:crouch_one_cm',
   'minecraft:boat_one_cm',
   'minecraft:horse_one_cm',
   'minecraft:pig_one_cm',
   'minecraft:strider_one_cm',
   'minecraft:minecart_one_cm',
-  'minecraft:aviate_one_cm'
+  'minecraft:aviate_one_cm',
+  'minecraft:happy_ghast_one_cm'
 ])
 
 const MINECRAFT_TICKS_PER_SECOND = 20

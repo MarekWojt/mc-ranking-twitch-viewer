@@ -41,6 +41,7 @@ export default defineEventHandler(async (): Promise<DataWithFreshness<StatisticL
         groupLabel: definition.groupLabel,
         specificSubgroup: definition.specificSubgroup,
         maxValue,
+        maxDisplayValue: formatStatisticDisplayValue(definition.key, maxValue),
         leaders
       }
     })

@@ -4,7 +4,13 @@ import type { TableColumn } from '@nuxt/ui'
 interface PivotedActionCell {
   slug: string
   maxValue: number
+  maxDisplayValue: string
   leaders: StatisticLeaderDto[]
+}
+
+interface GeneralStatisticThemeGroup {
+  theme: string
+  statistics: StatisticListItemDto[]
 }
 
 interface PivotedStatisticRow {
@@ -50,6 +56,27 @@ const generalStatistics = computed(() =>
   filteredStatistics.value.filter(statistic => statistic.group === 'allgemein')
 )
 
+const generalStatisticThemeGroups = computed<GeneralStatisticThemeGroup[]>(() => {
+  const statisticsByTheme = new Map<string, StatisticListItemDto[]>()
+  for (const statistic of generalStatistics.value) {
+    const theme = statistic.groupLabel ?? 'Sonstiges'
+    const themeStatistics = statisticsByTheme.get(theme) ?? []
+    themeStatistics.push(statistic)
+    statisticsByTheme.set(theme, themeStatistics)
+  }
+
+  for (const themeStatistics of statisticsByTheme.values()) {
+    themeStatistics.sort((a, b) => b.maxValue - a.maxValue)
+  }
+
+  const orderedThemes = [
+    ...GENERAL_STATISTIC_THEME_ORDER.filter(theme => statisticsByTheme.has(theme)),
+    ...[...statisticsByTheme.keys()].filter(theme => !GENERAL_STATISTIC_THEME_ORDER.includes(theme)).sort()
+  ]
+
+  return orderedThemes.map(theme => ({ theme, statistics: statisticsByTheme.get(theme)! }))
+})
+
 const itemStatistics = computed(() =>
   filteredStatistics.value.filter(statistic => statistic.specificSubgroup === 'items')
 )
@@ -57,11 +84,6 @@ const itemStatistics = computed(() =>
 const entityStatistics = computed(() =>
   filteredStatistics.value.filter(statistic => statistic.specificSubgroup === 'entities')
 )
-
-const generalStatisticTableColumns: TableColumn<StatisticListItemDto>[] = [
-  { accessorKey: 'label', header: 'Statistik' },
-  { id: 'leader', header: '1. Platz' }
-]
 
 const itemsAndEntitiesTabItems = [
   { label: 'Items', value: 'items', slot: 'items' as const },
@@ -71,6 +93,44 @@ const itemsAndEntitiesTabItems = [
 function openStatisticDetail(_event: Event, row: { original: StatisticListItemDto }) {
   navigateTo(`/statistiken/${row.original.slug}`)
 }
+
+function renderStatisticLeaderCell(slug: string, leaders: StatisticLeaderDto[], displayValue: string) {
+  if (leaders.length === 0) return '–'
+
+  const primaryLeader = leaders[0]!
+  const allLeaderNames = leaders.map(leader => leader.displayName).join(', ')
+
+  return h('button', {
+    type: 'button',
+    class: 'flex items-center gap-1.5 hover:opacity-80',
+    title: allLeaderNames,
+    onClick: (event: MouseEvent) => {
+      event.stopPropagation()
+      navigateTo(`/statistiken/${slug}`)
+    }
+  }, [
+    h('img', {
+      src: buildMinecraftAvatarRenderUrl(primaryLeader.minecraftUuid, 'avatar'),
+      alt: allLeaderNames,
+      class: 'size-6 rounded',
+      loading: 'lazy',
+      onError: (event: Event) => {
+        (event.target as HTMLImageElement).style.display = 'none'
+      }
+    }),
+    h('span', { class: 'text-sm tabular-nums' }, displayValue)
+  ])
+}
+
+const generalStatisticTableColumns: TableColumn<StatisticListItemDto>[] = [
+  { accessorKey: 'label', header: 'Statistik', meta: { class: { th: 'w-1/2', td: 'w-1/2' } } },
+  {
+    id: 'leader',
+    header: '1. Platz',
+    meta: { class: { th: 'w-1/2', td: 'w-1/2' } },
+    cell: ({ row }) => renderStatisticLeaderCell(row.original.slug, row.original.leaders, row.original.maxDisplayValue)
+  }
+]
 
 function buildPivotedStatisticRows(statisticsToPivot: StatisticListItemDto[]): PivotedStatisticRow[] {
   const rowsByObjectLabel = new Map<string, PivotedStatisticRow>()
@@ -83,6 +143,7 @@ function buildPivotedStatisticRows(statisticsToPivot: StatisticListItemDto[]): P
     row.cellsByActionLabel[statistic.groupLabel] = {
       slug: statistic.slug,
       maxValue: statistic.maxValue,
+      maxDisplayValue: statistic.maxDisplayValue,
       leaders: statistic.leaders
     }
     rowsByObjectLabel.set(statistic.label, row)
@@ -110,31 +171,8 @@ function buildActionColumns(statisticsToPivot: StatisticListItemDto[]): TableCol
     header: actionLabel,
     cell: ({ row }: { row: { original: PivotedStatisticRow } }) => {
       const cell = row.original.cellsByActionLabel[actionLabel]
-      if (!cell || cell.leaders.length === 0) return '–'
-
-      const primaryLeader = cell.leaders[0]!
-      const allLeaderNames = cell.leaders.map(leader => leader.displayName).join(', ')
-
-      return h('button', {
-        type: 'button',
-        class: 'flex items-center gap-1.5 hover:opacity-80',
-        title: allLeaderNames,
-        onClick: (event: MouseEvent) => {
-          event.stopPropagation()
-          navigateTo(`/statistiken/${cell.slug}`)
-        }
-      }, [
-        h('img', {
-          src: buildMinecraftAvatarRenderUrl(primaryLeader.minecraftUuid, 'avatar'),
-          alt: allLeaderNames,
-          class: 'size-6 rounded',
-          loading: 'lazy',
-          onError: (event: Event) => {
-            (event.target as HTMLImageElement).style.display = 'none'
-          }
-        }),
-        h('span', { class: 'text-sm tabular-nums' }, cell.maxValue.toLocaleString('de-DE'))
-      ])
+      if (!cell) return '–'
+      return renderStatisticLeaderCell(cell.slug, cell.leaders, cell.maxDisplayValue)
     }
   }))
 }
@@ -180,19 +218,24 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
       </div>
     </div>
 
-    <section class="space-y-3">
+    <section class="space-y-6">
       <h2 class="text-lg font-medium">
         Allgemein
       </h2>
-      <UTable
-        :data="generalStatistics"
-        :columns="generalStatisticTableColumns"
-        @select="openStatisticDetail"
+      <div
+        v-for="themeGroup in generalStatisticThemeGroups"
+        :key="themeGroup.theme"
+        class="space-y-3"
       >
-        <template #leader-cell="{ row }">
-          {{ row.original.leaders.map(leader => leader.displayName).join(', ') || '–' }}
-        </template>
-      </UTable>
+        <h3 class="text-sm font-medium text-muted">
+          {{ themeGroup.theme }}
+        </h3>
+        <UTable
+          :data="themeGroup.statistics"
+          :columns="generalStatisticTableColumns"
+          @select="openStatisticDetail"
+        />
+      </div>
     </section>
 
     <section class="space-y-3">

@@ -40,6 +40,7 @@ export interface StatisticListItemDto {
   groupLabel: string | null
   specificSubgroup: SpecificStatisticSubgroup | null
   maxValue: number
+  maxDisplayValue: string
   leaders: StatisticLeaderDto[]
 }
 

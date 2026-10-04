@@ -28,7 +28,7 @@ export function buildStatisticDefinition(category: string, key: string): Statist
     category,
     key,
     group: isGeneralStatistic ? 'allgemein' : 'spezifisch',
-    groupLabel: isGeneralStatistic ? null : humanizeMinecraftId(category),
+    groupLabel: isGeneralStatistic ? classifyGeneralStatisticTheme(key) : humanizeMinecraftId(category),
     specificSubgroup: isGeneralStatistic ? null : classifySpecificStatisticSubgroup(category),
     label: humanizeMinecraftId(key)
   }
