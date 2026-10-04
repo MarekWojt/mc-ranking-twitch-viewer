@@ -32,9 +32,17 @@ const statisticTabItems = [
   { label: 'Entities', value: 'entities', slot: 'entities' as const }
 ]
 
+const route = useRoute()
+
+function currentQueryOverrides(): Record<string, string> {
+  const query: Record<string, string> = {}
+  if (pivotValueMode.value !== DEFAULT_PIVOT_VALUE_MODE) query.wert = 'summe'
+  return query
+}
+
 const activeStatisticTab = computed({
   get: () => props.activeTab,
-  set: (newTab: string) => navigateTo(`/statistiken/${newTab}`)
+  set: (newTab: string) => navigateTo({ path: `/statistiken/${newTab}`, query: currentQueryOverrides() })
 })
 
 const { data: response, refresh } = await useFetch<DataWithFreshness<StatisticListItemDto[]>>('/api/statistics')
@@ -47,7 +55,31 @@ const dataAsOf = computed(() => response.value?.asOf ?? null)
 
 type PivotValueMode = 'max' | 'total'
 
-const pivotValueMode = ref<PivotValueMode>('max')
+const DEFAULT_PIVOT_VALUE_MODE: PivotValueMode = 'max'
+
+const pivotValueMode = ref<PivotValueMode>(route.query.wert === 'summe' ? 'total' : DEFAULT_PIVOT_VALUE_MODE)
+
+const DEFAULT_PIVOT_SORTING = [{ id: 'valueAcrossActions', desc: true }]
+
+function parsePivotSortingFromQuery(queryValue: unknown): { id: string, desc: boolean }[] {
+  if (typeof queryValue !== 'string') return DEFAULT_PIVOT_SORTING
+
+  const [id, direction] = queryValue.split('.')
+  if (!id || (direction !== 'asc' && direction !== 'desc')) return DEFAULT_PIVOT_SORTING
+
+  return [{ id, desc: direction === 'desc' }]
+}
+
+const pivotSorting = ref(parsePivotSortingFromQuery(route.query.sortierung))
+
+watch([pivotValueMode, pivotSorting], () => {
+  const query = currentQueryOverrides()
+  const sortEntry = pivotSorting.value[0]
+  if (sortEntry && (sortEntry.id !== DEFAULT_PIVOT_SORTING[0]!.id || sortEntry.desc !== DEFAULT_PIVOT_SORTING[0]!.desc)) {
+    query.sortierung = `${sortEntry.id}.${sortEntry.desc ? 'desc' : 'asc'}`
+  }
+  navigateTo({ path: route.path, query }, { replace: true })
+}, { deep: true })
 
 function findItemIconSrc(minecraftKey: string): string | null {
   return iconBundle.value?.itemIconsByBareId[stripMinecraftNamespace(minecraftKey)] ?? null
@@ -276,8 +308,6 @@ function buildTotalsRow(statisticsToPivot: StatisticListItemDto[]): PivotedStati
   }
 }
 
-const pivotTableInitialState = { sorting: [{ id: 'valueAcrossActions', desc: true }] }
-
 const itemPivotRows = computed(() => {
   void pivotValueMode.value // read so this computed (and thus the table's sorted row model) re-runs on toggle, not just the columns
   return [
@@ -349,12 +379,12 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
 
         <template #items>
           <UTable
+            v-model:sorting="pivotSorting"
             :data="itemPivotRows"
             :columns="itemPivotColumns"
             :meta="pivotTableRowMeta"
             :get-row-id="(row: PivotedStatisticRow) => row.objectKey"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
-            :initial-state="pivotTableInitialState"
             @select="openItemDetail"
           >
             <template #objectLabel-cell="{ row }">
@@ -374,12 +404,12 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
 
         <template #entities>
           <UTable
+            v-model:sorting="pivotSorting"
             :data="entityPivotRows"
             :columns="entityPivotColumns"
             :meta="pivotTableRowMeta"
             :get-row-id="(row: PivotedStatisticRow) => row.objectKey"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
-            :initial-state="pivotTableInitialState"
             @select="openEntityDetail"
           >
             <template #objectLabel-cell="{ row }">
