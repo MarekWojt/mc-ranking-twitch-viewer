@@ -13,9 +13,11 @@ export interface ParticipantListItemDto {
 
 export interface ParticipantStatisticRowDto {
   slug: string
+  key: string
   label: string
   group: StatisticGroup
   groupLabel: string | null
+  specificSubgroup: SpecificStatisticSubgroup | null
   value: number
   displayValue: string
   points: number

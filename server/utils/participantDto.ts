@@ -16,9 +16,11 @@ export function toParticipantListItemDto(scoredParticipant: ScoredParticipant): 
 export function toParticipantStatisticRowDto(score: ParticipantStatisticScore): ParticipantStatisticRowDto {
   return {
     slug: score.statistic.slug,
+    key: score.statistic.key,
     label: score.statistic.label,
     group: score.statistic.group,
     groupLabel: score.statistic.groupLabel,
+    specificSubgroup: score.statistic.specificSubgroup,
     value: score.value,
     displayValue: formatStatisticDisplayValue(score.statistic.key, score.value),
     points: score.points
