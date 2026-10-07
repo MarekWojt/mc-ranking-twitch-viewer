@@ -37,6 +37,7 @@ export default defineEventHandler(async (): Promise<DataWithFreshness<StatisticL
       return {
         slug: definition.slug,
         key: definition.key,
+        category: definition.category,
         label: definition.label,
         group: definition.group,
         groupLabel: definition.groupLabel,

@@ -1,17 +1,17 @@
 import type { VNodeChild } from 'vue'
 
-export const ITEM_ACTION_ICON_BY_LABEL: Record<string, string> = {
-  'Broken': '💥',
-  'Crafted': '🛠️',
-  'Dropped': '🔻',
-  'Mined': '⛏️',
-  'Picked Up': '🔺',
-  'Used': '✋'
+export const ITEM_ACTION_ICON_BY_CATEGORY: Record<string, string> = {
+  broken: '💥',
+  crafted: '🛠️',
+  dropped: '🔻',
+  mined: '⛏️',
+  picked_up: '🔺',
+  used: '✋'
 }
 
-export const ENTITY_ACTION_ICON_BY_LABEL: Record<string, string> = {
-  'Killed': '🔪',
-  'Killed By': '☠️'
+export const ENTITY_ACTION_ICON_BY_CATEGORY: Record<string, string> = {
+  killed: '🔪',
+  killed_by: '☠️'
 }
 
 export type SortableColumn = { getIsSorted: () => false | 'asc' | 'desc', toggleSorting: () => void }

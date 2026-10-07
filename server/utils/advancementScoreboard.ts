@@ -61,7 +61,7 @@ export async function computeAdvancementScoreboard(): Promise<AdvancementScorebo
   const advancements: ScoredAdvancement[] = [...completedAtByParticipantIdByAdvancementId.entries()].map(([advancementId, completedAtByParticipantId]) => {
     const participantCount = Object.keys(completedAtByParticipantId).length
     return {
-      definition: buildAdvancementDefinition(advancementId, vanillaTextByAdvancementId[advancementId]),
+      definition: buildAdvancementDefinition(advancementId, vanillaTextByAdvancementId),
       participantCount,
       points: calculateAdvancementPoints(participantCount),
       completedAtByParticipantId

@@ -25,7 +25,13 @@ const iconSrc = computed(() => props.kind === 'items'
   ? iconBundle.value?.itemIconsByBareId[props.bareKey] ?? null
   : iconBundle.value?.entityIconsByBareId[props.bareKey] ?? null)
 
-const actionIconByLabel = computed(() => props.kind === 'items' ? ITEM_ACTION_ICON_BY_LABEL : ENTITY_ACTION_ICON_BY_LABEL)
+const actionIconByCategory = computed(() => props.kind === 'items' ? ITEM_ACTION_ICON_BY_CATEGORY : ENTITY_ACTION_ICON_BY_CATEGORY)
+
+function resolveActionIcon(actionLabel: string): string | null {
+  const category = detail.value?.categoryByActionLabel[actionLabel]
+  if (!category) return null
+  return actionIconByCategory.value[stripMinecraftNamespace(category)] ?? null
+}
 
 const actionLabels = computed(() => {
   const labels = new Set<string>()
@@ -51,7 +57,7 @@ const tableColumns = computed<TableColumn<ObjectStatisticParticipantRowDto>[]>((
       accessorFn: (row: ObjectStatisticParticipantRowDto) =>
         displayMode === 'value' ? (row.valueByActionLabel[actionLabel] ?? 0) : (row.pointsByActionLabel[actionLabel] ?? 0),
       header: ({ column }: { column: SortableColumn }) =>
-        renderSortableColumnHeader(column, renderActionColumnHeaderContent(actionLabel, actionIconByLabel.value[actionLabel] ?? null)),
+        renderSortableColumnHeader(column, renderActionColumnHeaderContent(actionLabel, resolveActionIcon(actionLabel))),
       cell: ({ row }: { row: { original: ObjectStatisticParticipantRowDto } }) => {
         const isTotalsRow = row.original.participantId === TOTALS_ROW_PARTICIPANT_ID
 

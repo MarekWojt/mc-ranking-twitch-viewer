@@ -11,6 +11,9 @@ export async function buildObjectStatisticDetail(
   if (matchingDefinitions.length === 0) return null
 
   const objectLabel = matchingDefinitions[0]!.label
+  const categoryByActionLabel = Object.fromEntries(
+    matchingDefinitions.map(definition => [definition.groupLabel!, definition.category])
+  )
 
   const participants = scoreboard.participants.map(({ participant, statistics }) => {
     const valueByActionLabel: Record<string, number> = {}
@@ -44,6 +47,6 @@ export async function buildObjectStatisticDetail(
 
   return {
     asOf: scoreboard.asOf,
-    payload: { objectKey, objectLabel, participants }
+    payload: { objectKey, objectLabel, categoryByActionLabel, participants }
   }
 }

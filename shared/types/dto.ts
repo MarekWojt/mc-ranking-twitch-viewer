@@ -14,6 +14,7 @@ export interface ParticipantListItemDto {
 export interface ParticipantStatisticRowDto {
   slug: string
   key: string
+  category: string
   label: string
   group: StatisticGroup
   groupLabel: string | null
@@ -48,6 +49,7 @@ export interface StatisticLeaderDto {
 export interface StatisticListItemDto {
   slug: string
   key: string
+  category: string
   label: string
   group: StatisticGroup
   groupLabel: string | null
@@ -99,6 +101,7 @@ export interface ObjectStatisticParticipantRowDto {
 export interface ObjectStatisticDetailDto {
   objectKey: string
   objectLabel: string
+  categoryByActionLabel: Record<string, string>
   participants: ObjectStatisticParticipantRowDto[]
 }
 

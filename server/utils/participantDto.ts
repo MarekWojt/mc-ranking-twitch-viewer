@@ -17,6 +17,7 @@ export function toParticipantStatisticRowDto(score: ParticipantStatisticScore): 
   return {
     slug: score.statistic.slug,
     key: score.statistic.key,
+    category: score.statistic.category,
     label: score.statistic.label,
     group: score.statistic.group,
     groupLabel: score.statistic.groupLabel,

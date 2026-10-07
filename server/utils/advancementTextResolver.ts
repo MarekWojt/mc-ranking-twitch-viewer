@@ -1,4 +1,3 @@
-const VANILLA_LANGUAGE_FILE_URL = 'https://raw.githubusercontent.com/misode/mcmeta/assets/assets/minecraft/lang/en_us.json'
 const ADVANCEMENT_TRANSLATION_KEY_PATTERN = /^advancements\.([a-z_]+)\.([a-z_]+)\.(title|description)$/
 
 export interface VanillaAdvancementText {
@@ -13,24 +12,17 @@ const advancementTextCacheOptions = {
 }
 
 export const loadVanillaAdvancementTextByAdvancementId = defineCachedFunction(async (): Promise<Record<string, Partial<VanillaAdvancementText>>> => {
-  const languageFileBytes = await getOrDownloadCachedIcon('advancement-lang/en_us.json', VANILLA_LANGUAGE_FILE_URL)
-  if (languageFileBytes === null) return {}
+  const allTranslationsByKey = await loadVanillaLanguageFile()
+  const textByAdvancementId: Record<string, Partial<VanillaAdvancementText>> = {}
 
-  try {
-    const allTranslationsByKey = JSON.parse(languageFileBytes.toString('utf8')) as Record<string, string>
-    const textByAdvancementId: Record<string, Partial<VanillaAdvancementText>> = {}
+  for (const [translationKey, translation] of Object.entries(allTranslationsByKey)) {
+    const match = translationKey.match(ADVANCEMENT_TRANSLATION_KEY_PATTERN)
+    if (!match) continue
 
-    for (const [translationKey, translation] of Object.entries(allTranslationsByKey)) {
-      const match = translationKey.match(ADVANCEMENT_TRANSLATION_KEY_PATTERN)
-      if (!match) continue
-
-      const advancementId = `minecraft:${match[1]}/${match[2]}`
-      const field = match[3] as 'title' | 'description'
-      textByAdvancementId[advancementId] = { ...textByAdvancementId[advancementId], [field]: translation }
-    }
-
-    return textByAdvancementId
-  } catch {
-    return {}
+    const advancementId = `minecraft:${match[1]}/${match[2]}`
+    const field = match[3] as 'title' | 'description'
+    textByAdvancementId[advancementId] = { ...textByAdvancementId[advancementId], [field]: translation }
   }
+
+  return textByAdvancementId
 }, advancementTextCacheOptions)

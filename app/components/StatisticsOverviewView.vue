@@ -311,15 +311,17 @@ function buildPivotedStatisticRows(statisticsToPivot: StatisticListItemDto[]): P
 
 function buildActionColumns(
   statisticsToPivot: StatisticListItemDto[],
-  resolveHeaderIcon: (actionLabel: string) => string | null = () => null
+  resolveHeaderIcon: (category: string) => string | null = () => null
 ): TableColumn<PivotedStatisticRow>[] {
   const valueMode = pivotValueMode.value
-  const actionLabels = [...new Set(
-    statisticsToPivot.map(statistic => statistic.groupLabel).filter((label): label is string => label !== null)
-  )].sort()
+  const categoryByActionLabel = new Map<string, string>()
+  for (const statistic of statisticsToPivot) {
+    if (statistic.groupLabel !== null) categoryByActionLabel.set(statistic.groupLabel, statistic.category)
+  }
+  const actionLabels = [...categoryByActionLabel.keys()].sort()
 
   return actionLabels.map((actionLabel) => {
-    const headerIcon = resolveHeaderIcon(actionLabel)
+    const headerIcon = resolveHeaderIcon(categoryByActionLabel.get(actionLabel)!)
     const headerContent = renderActionColumnHeaderContent(actionLabel, headerIcon)
 
     return {
@@ -405,7 +407,7 @@ const itemPivotRows = computed(() => {
 })
 const itemPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
   { accessorKey: 'objectLabel', header: 'Objekt', enableSorting: false },
-  ...buildActionColumns(itemStatistics.value, actionLabel => ITEM_ACTION_ICON_BY_LABEL[actionLabel] ?? null),
+  ...buildActionColumns(itemStatistics.value, category => ITEM_ACTION_ICON_BY_CATEGORY[stripMinecraftNamespace(category)] ?? null),
   buildTotalValueAcrossActionsColumn()
 ])
 
@@ -418,7 +420,7 @@ const entityPivotRows = computed(() => {
 })
 const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
   { accessorKey: 'objectLabel', header: 'Objekt', enableSorting: false },
-  ...buildActionColumns(entityStatistics.value, actionLabel => ENTITY_ACTION_ICON_BY_LABEL[actionLabel] ?? null),
+  ...buildActionColumns(entityStatistics.value, category => ENTITY_ACTION_ICON_BY_CATEGORY[stripMinecraftNamespace(category)] ?? null),
   buildTotalValueAcrossActionsColumn()
 ])
 </script>
