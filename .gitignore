@@ -25,3 +25,7 @@ logs
 
 # Local participant data
 participants.toml
+
+# Local project data
+players
+todo.md
