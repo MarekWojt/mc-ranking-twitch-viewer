@@ -1,6 +1,32 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
+interface ResolvedStatistic {
+  slug: string
+  key: string
+  category: string
+  label: string
+  group: StatisticGroup
+  groupLabel: string | null
+  specificSubgroup: SpecificStatisticSubgroup | null
+  value: number
+  displayValue: string
+  points: number
+  searchText: string
+}
+
+interface ResolvedAdvancement {
+  slug: string
+  category: string
+  label: string
+  description: string | null
+  groupLabel: string
+  points: number
+  completedAt: string | null
+  completedAtDisplay: string
+  searchText: string
+}
+
 interface PivotedParticipantActionCell {
   value: number
   displayValue: string
@@ -9,13 +35,13 @@ interface PivotedParticipantActionCell {
 
 interface GeneralStatisticThemeGroup {
   theme: string
-  statistics: ParticipantStatisticRowDto[]
+  statistics: ResolvedStatistic[]
 }
 
 interface PivotedParticipantRow {
   objectKey: string
   objectLabel: string
-  cellsByActionLabel: Record<string, PivotedParticipantActionCell | undefined>
+  cellsByActionCategory: Record<string, PivotedParticipantActionCell | undefined>
   totalValue: number
   totalPoints: number
 }
@@ -35,6 +61,28 @@ const participant = computed(() => response.value?.payload ?? null)
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
 const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+
+const { resolvedObjectsLocale, resolvedStatisticsLocale, resolvedAdvancementsLocale } = useMinecraftNameLocale()
+
+// single place where the raw bilingual API payload is resolved into plain display strings for the currently selected locale per type - everything below this point works with plain strings only
+const statistics = computed<ResolvedStatistic[]>(() => {
+  const rawStatistics = participant.value?.statistics ?? []
+
+  return rawStatistics.map(statistic => ({
+    ...statistic,
+    ...resolveStatisticLabelAndGroupLabel(statistic, resolvedObjectsLocale.value, resolvedStatisticsLocale.value)
+  }))
+})
+
+const advancements = computed<ResolvedAdvancement[]>(() => {
+  const rawAdvancements = participant.value?.advancements ?? []
+  const locale = resolvedAdvancementsLocale.value
+
+  return rawAdvancements.map(advancement => ({
+    ...advancement,
+    ...resolveAdvancementFields(advancement, locale)
+  }))
+})
 
 function findItemIconSrc(minecraftKey: string): string | null {
   return iconBundle.value?.itemIconsByBareId[stripMinecraftNamespace(minecraftKey)] ?? null
@@ -59,13 +107,10 @@ const statDisplayMode = ref<StatDisplayMode>('value')
 const statisticsSearchQuery = ref('')
 
 const filteredStatistics = computed(() => {
-  const allStatistics = participant.value?.statistics ?? []
   const searchQuery = statisticsSearchQuery.value.trim().toLowerCase()
-  if (searchQuery.length === 0) return allStatistics
+  if (searchQuery.length === 0) return statistics.value
 
-  return allStatistics.filter(statistic =>
-    `${statistic.groupLabel} ${statistic.label}`.toLowerCase().includes(searchQuery)
-  )
+  return statistics.value.filter(statistic => statistic.searchText.includes(searchQuery))
 })
 
 const generalStatistics = computed(() =>
@@ -74,28 +119,31 @@ const generalStatistics = computed(() =>
 
 const selectedAdvancementCategory = ref<string | null>(null)
 
-const advancementCategories = computed(() =>
-  [...new Set((participant.value?.advancements ?? []).map(advancement => advancement.groupLabel))].sort()
-)
+const advancementCategoryOptions = computed(() => {
+  const labelByCategory = new Map<string, string>()
+  for (const advancement of advancements.value) {
+    labelByCategory.set(advancement.category, advancement.groupLabel)
+  }
+  return [...labelByCategory.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+})
 
 const advancementCategoryFilterItems = computed(() => [
   { label: 'Alle', value: null },
-  ...advancementCategories.value.map(category => ({ label: category, value: category }))
+  ...advancementCategoryOptions.value.map(([category, label]) => ({ label, value: category }))
 ])
 
 const filteredAdvancements = computed(() => {
-  const allAdvancements = participant.value?.advancements ?? []
   const searchQuery = statisticsSearchQuery.value.trim().toLowerCase()
 
-  return allAdvancements.filter((advancement) => {
-    if (selectedAdvancementCategory.value !== null && advancement.groupLabel !== selectedAdvancementCategory.value) return false
+  return advancements.value.filter((advancement) => {
+    if (selectedAdvancementCategory.value !== null && advancement.category !== selectedAdvancementCategory.value) return false
     if (searchQuery.length === 0) return true
-    return `${advancement.groupLabel} ${advancement.label}`.toLowerCase().includes(searchQuery)
+    return advancement.searchText.includes(searchQuery)
   })
 })
 
 const generalStatisticThemeGroups = computed<GeneralStatisticThemeGroup[]>(() => {
-  const statisticsByTheme = new Map<string, ParticipantStatisticRowDto[]>()
+  const statisticsByTheme = new Map<string, ResolvedStatistic[]>()
   for (const statistic of generalStatistics.value) {
     const theme = statistic.groupLabel ?? 'Sonstiges'
     const themeStatistics = statisticsByTheme.get(theme) ?? []
@@ -132,28 +180,38 @@ const statisticTabItems = [
 
 const activeStatisticTab = ref('allgemein')
 
-function openStatisticDetail(_event: Event, row: { original: ParticipantStatisticRowDto }) {
+function openStatisticDetail(_event: Event, row: { original: ResolvedStatistic }) {
   navigateTo(`/statistiken/${row.original.slug}`)
 }
 
 const TOTALS_ROW_OBJECT_KEY = '__totals__'
 
-function openAdvancementDetail(_event: Event, row: { original: ParticipantAdvancementRowDto }) {
+function openAdvancementDetail(_event: Event, row: { original: ResolvedAdvancement }) {
   if (row.original.slug === TOTALS_ROW_OBJECT_KEY) return
   navigateTo(`/statistiken/advancements/${row.original.slug}`)
 }
 
-const advancementRows = computed<ParticipantAdvancementRowDto[]>(() => {
-  const advancements = filteredAdvancements.value
-  const totalPoints = advancements.reduce((sum, advancement) => sum + advancement.points, 0)
+const advancementRows = computed<ResolvedAdvancement[]>(() => {
+  const advancementsToShow = filteredAdvancements.value
+  const totalPoints = advancementsToShow.reduce((sum, advancement) => sum + advancement.points, 0)
 
   return [
-    { slug: TOTALS_ROW_OBJECT_KEY, label: 'Gesamt', description: null, groupLabel: '', points: totalPoints, completedAt: null, completedAtDisplay: '' },
-    ...advancements
+    {
+      slug: TOTALS_ROW_OBJECT_KEY,
+      category: '',
+      label: 'Gesamt',
+      description: null,
+      groupLabel: '',
+      points: totalPoints,
+      completedAt: null,
+      completedAtDisplay: '',
+      searchText: ''
+    },
+    ...advancementsToShow
   ]
 })
 
-const advancementTableColumns: TableColumn<ParticipantAdvancementRowDto>[] = [
+const advancementTableColumns: TableColumn<ResolvedAdvancement>[] = [
   { accessorKey: 'label', header: 'Advancement', meta: { class: { th: 'h-14' } } },
   { accessorKey: 'groupLabel', header: 'Kategorie', meta: { class: { th: 'text-center', td: 'text-center' } } },
   { accessorKey: 'completedAtDisplay', header: 'Erreicht am', meta: { class: { th: 'text-center', td: 'text-center' } } },
@@ -169,7 +227,7 @@ const advancementTableColumns: TableColumn<ParticipantAdvancementRowDto>[] = [
 
 const advancementsTableRowMeta = {
   class: {
-    tr: (row: { original: ParticipantAdvancementRowDto }) =>
+    tr: (row: { original: ResolvedAdvancement }) =>
       row.original.slug === TOTALS_ROW_OBJECT_KEY ? 'border-b-2 border-default' : ''
   }
 }
@@ -184,7 +242,7 @@ function openEntityDetail(_event: Event, row: { original: PivotedParticipantRow 
   navigateTo(`/statistiken/entities/${stripMinecraftNamespace(row.original.objectKey)}`)
 }
 
-const generalStatisticTableColumns = computed<TableColumn<ParticipantStatisticRowDto>[]>(() => [
+const generalStatisticTableColumns = computed<TableColumn<ResolvedStatistic>[]>(() => [
   { accessorKey: 'label', header: 'Statistik', meta: { class: { th: 'w-1/2', td: 'w-1/2' } } },
   {
     id: 'value',
@@ -194,55 +252,61 @@ const generalStatisticTableColumns = computed<TableColumn<ParticipantStatisticRo
   }
 ])
 
-function buildPivotedParticipantRows(statisticsToPivot: ParticipantStatisticRowDto[]): PivotedParticipantRow[] {
-  const rowsByObjectLabel = new Map<string, PivotedParticipantRow>()
+function buildPivotedParticipantRows(statisticsToPivot: ResolvedStatistic[]): PivotedParticipantRow[] {
+  const rowsByObjectKey = new Map<string, PivotedParticipantRow>()
 
   for (const statistic of statisticsToPivot) {
     if (statistic.groupLabel === null) continue
 
-    const row = rowsByObjectLabel.get(statistic.label)
-      ?? { objectKey: statistic.key, objectLabel: statistic.label, cellsByActionLabel: {}, totalValue: 0, totalPoints: 0 }
-    row.cellsByActionLabel[statistic.groupLabel] = {
+    const row = rowsByObjectKey.get(statistic.key)
+      ?? { objectKey: statistic.key, objectLabel: statistic.label, cellsByActionCategory: {}, totalValue: 0, totalPoints: 0 }
+    row.cellsByActionCategory[statistic.category] = {
       value: statistic.value,
       displayValue: statistic.displayValue,
       points: statistic.points
     }
-    rowsByObjectLabel.set(statistic.label, row)
+    rowsByObjectKey.set(statistic.key, row)
   }
 
-  for (const row of rowsByObjectLabel.values()) {
-    row.totalValue = Object.values(row.cellsByActionLabel).reduce((sum, cell) => sum + (cell?.value ?? 0), 0)
-    row.totalPoints = Object.values(row.cellsByActionLabel).reduce((sum, cell) => sum + (cell?.points ?? 0), 0)
+  for (const row of rowsByObjectKey.values()) {
+    row.totalValue = Object.values(row.cellsByActionCategory).reduce((sum, cell) => sum + (cell?.value ?? 0), 0)
+    row.totalPoints = Object.values(row.cellsByActionCategory).reduce((sum, cell) => sum + (cell?.points ?? 0), 0)
   }
 
-  return [...rowsByObjectLabel.values()]
+  return [...rowsByObjectKey.values()]
 }
 
 function buildActionColumns(
-  statisticsToPivot: ParticipantStatisticRowDto[],
+  statisticsToPivot: ResolvedStatistic[],
   resolveHeaderIcon: (category: string) => string | null = () => null
 ): TableColumn<PivotedParticipantRow>[] {
   const displayMode = statDisplayMode.value
-  const categoryByActionLabel = new Map<string, string>()
+  const labelByCategory = new Map<string, string>()
+  const totalValueByCategory = new Map<string, number>()
   for (const statistic of statisticsToPivot) {
-    if (statistic.groupLabel !== null) categoryByActionLabel.set(statistic.groupLabel, statistic.category)
+    if (statistic.groupLabel === null) continue
+    labelByCategory.set(statistic.category, statistic.groupLabel)
+    // matches whatever buildTotalsRow shows in the Gesamt row for the active mode, so the column order lines up with it
+    const categoryValue = displayMode === 'value' ? statistic.value : statistic.points
+    totalValueByCategory.set(statistic.category, (totalValueByCategory.get(statistic.category) ?? 0) + categoryValue)
   }
-  const actionLabels = [...categoryByActionLabel.keys()].sort()
+  const categories = sortKeysByTotalDescending(labelByCategory.keys(), category => totalValueByCategory.get(category) ?? 0)
 
-  return actionLabels.map((actionLabel) => {
-    const headerIcon = resolveHeaderIcon(categoryByActionLabel.get(actionLabel)!)
+  return categories.map((category) => {
+    const actionLabel = labelByCategory.get(category)!
+    const headerIcon = resolveHeaderIcon(category)
     const headerContent = renderActionColumnHeaderContent(actionLabel, headerIcon)
 
     return {
-      id: actionLabel,
+      id: category,
       accessorFn: (row: PivotedParticipantRow) => {
-        const cell = row.cellsByActionLabel[actionLabel]
+        const cell = row.cellsByActionCategory[category]
         if (!cell) return 0
         return displayMode === 'value' ? cell.value : cell.points
       },
       header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, headerContent),
       cell: ({ row }: { row: { original: PivotedParticipantRow } }) => {
-        const cell = row.original.cellsByActionLabel[actionLabel]
+        const cell = row.original.cellsByActionCategory[category]
         if (!cell) return '–'
         const isTotalsRow = row.original.objectKey === TOTALS_ROW_OBJECT_KEY
 
@@ -278,27 +342,27 @@ const pivotTableRowMeta = {
   }
 }
 
-function buildTotalsRow(statisticsToPivot: ParticipantStatisticRowDto[]): PivotedParticipantRow {
-  const valueSumByActionLabel: Record<string, number> = {}
-  const pointsSumByActionLabel: Record<string, number> = {}
+function buildTotalsRow(statisticsToPivot: ResolvedStatistic[]): PivotedParticipantRow {
+  const valueSumByCategory: Record<string, number> = {}
+  const pointsSumByCategory: Record<string, number> = {}
   for (const statistic of statisticsToPivot) {
     if (statistic.groupLabel === null) continue
-    valueSumByActionLabel[statistic.groupLabel] = (valueSumByActionLabel[statistic.groupLabel] ?? 0) + statistic.value
-    pointsSumByActionLabel[statistic.groupLabel] = (pointsSumByActionLabel[statistic.groupLabel] ?? 0) + statistic.points
+    valueSumByCategory[statistic.category] = (valueSumByCategory[statistic.category] ?? 0) + statistic.value
+    pointsSumByCategory[statistic.category] = (pointsSumByCategory[statistic.category] ?? 0) + statistic.points
   }
 
   return {
     objectKey: TOTALS_ROW_OBJECT_KEY,
     objectLabel: 'Gesamt',
-    cellsByActionLabel: Object.fromEntries(
-      Object.keys(valueSumByActionLabel).map((actionLabel) => {
-        const value = valueSumByActionLabel[actionLabel]!
-        const points = pointsSumByActionLabel[actionLabel]!
-        return [actionLabel, { value, displayValue: value.toLocaleString('de-DE'), points }]
+    cellsByActionCategory: Object.fromEntries(
+      Object.keys(valueSumByCategory).map((category) => {
+        const value = valueSumByCategory[category]!
+        const points = pointsSumByCategory[category]!
+        return [category, { value, displayValue: value.toLocaleString('de-DE'), points }]
       })
     ),
-    totalValue: Object.values(valueSumByActionLabel).reduce((sum, value) => sum + value, 0),
-    totalPoints: Object.values(pointsSumByActionLabel).reduce((sum, points) => sum + points, 0)
+    totalValue: Object.values(valueSumByCategory).reduce((sum, value) => sum + value, 0),
+    totalPoints: Object.values(pointsSumByCategory).reduce((sum, points) => sum + points, 0)
   }
 }
 
@@ -445,7 +509,7 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
             :data="advancementRows"
             :columns="advancementTableColumns"
             :meta="advancementsTableRowMeta"
-            :get-row-id="(row: ParticipantAdvancementRowDto) => row.slug"
+            :get-row-id="(row: ResolvedAdvancement) => row.slug"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
             @select="openAdvancementDetail"
           >

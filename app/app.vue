@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { de } from '@nuxt/ui/locale'
+
 const { serverName, serverFaviconUrl } = useRuntimeConfig().public
 
 useHead({
@@ -24,7 +26,7 @@ const navigationItems = [
 </script>
 
 <template>
-  <UApp>
+  <UApp :locale="de">
     <UHeader>
       <template #left>
         <NuxtLink
@@ -39,7 +41,7 @@ const navigationItems = [
       <UNavigationMenu :items="navigationItems" />
 
       <template #right>
-        <UColorModeButton />
+        <AppSettingsMenu />
       </template>
     </UHeader>
 

@@ -5,6 +5,35 @@ const props = defineProps<{
   activeTab: 'allgemein' | 'items' | 'entities' | 'advancements'
 }>()
 
+interface ResolvedStatistic {
+  slug: string
+  key: string
+  category: string
+  label: string
+  group: StatisticGroup
+  groupLabel: string | null
+  specificSubgroup: SpecificStatisticSubgroup | null
+  maxValue: number
+  maxDisplayValue: string
+  totalValue: number
+  totalDisplayValue: string
+  leaders: StatisticLeaderDto[]
+  searchText: string
+}
+
+interface ResolvedAdvancement {
+  slug: string
+  category: string
+  label: string
+  description: string | null
+  groupLabel: string
+  participantCount: number
+  points: number
+  mostRecentCompletedAt: string | null
+  mostRecentCompletedAtDisplay: string
+  searchText: string
+}
+
 interface PivotedActionCell {
   maxValue: number
   maxDisplayValue: string
@@ -15,13 +44,13 @@ interface PivotedActionCell {
 
 interface GeneralStatisticThemeGroup {
   theme: string
-  statistics: StatisticListItemDto[]
+  statistics: ResolvedStatistic[]
 }
 
 interface PivotedStatisticRow {
   objectKey: string
   objectLabel: string
-  cellsByActionLabel: Record<string, PivotedActionCell | undefined>
+  cellsByActionCategory: Record<string, PivotedActionCell | undefined>
   maxValueAcrossActions: number
   totalValueAcrossActions: number
 }
@@ -32,6 +61,8 @@ const statisticTabItems = [
   { label: 'Entities', value: 'entities', slot: 'entities' as const },
   { label: 'Advancements', value: 'advancements', slot: 'advancements' as const }
 ]
+
+const { resolvedObjectsLocale, resolvedStatisticsLocale, resolvedAdvancementsLocale } = useMinecraftNameLocale()
 
 const route = useRoute()
 
@@ -54,9 +85,27 @@ useAutoRefresh(refreshAdvancements, DATA_POLLING_INTERVAL_MILLISECONDS)
 
 const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
 
-const statistics = computed(() => response.value?.payload ?? [])
-const advancements = computed(() => advancementsResponse.value?.payload ?? [])
 const dataAsOf = computed(() => response.value?.asOf ?? null)
+
+// single place where the raw bilingual API payload is resolved into plain display strings for the currently selected locale per type - everything below this point works with plain strings only
+const statistics = computed<ResolvedStatistic[]>(() => {
+  const rawStatistics = response.value?.payload ?? []
+
+  return rawStatistics.map(statistic => ({
+    ...statistic,
+    ...resolveStatisticLabelAndGroupLabel(statistic, resolvedObjectsLocale.value, resolvedStatisticsLocale.value)
+  }))
+})
+
+const advancements = computed<ResolvedAdvancement[]>(() => {
+  const rawAdvancements = advancementsResponse.value?.payload ?? []
+  const locale = resolvedAdvancementsLocale.value
+
+  return rawAdvancements.map(advancement => ({
+    ...advancement,
+    ...resolveAdvancementFields(advancement, locale)
+  }))
+})
 
 type PivotValueMode = 'max' | 'total'
 
@@ -108,29 +157,31 @@ const filteredStatistics = computed(() => {
   const searchQuery = statisticsSearchQuery.value.trim().toLowerCase()
   if (searchQuery.length === 0) return statistics.value
 
-  return statistics.value.filter(statistic =>
-    `${statistic.groupLabel} ${statistic.label}`.toLowerCase().includes(searchQuery)
-  )
+  return statistics.value.filter(statistic => statistic.searchText.includes(searchQuery))
 })
 
 const selectedAdvancementCategory = ref<string | null>(null)
 
-const advancementCategories = computed(() =>
-  [...new Set(advancements.value.map(advancement => advancement.groupLabel))].sort()
-)
+const advancementCategoryOptions = computed(() => {
+  const labelByCategory = new Map<string, string>()
+  for (const advancement of advancements.value) {
+    labelByCategory.set(advancement.category, advancement.groupLabel)
+  }
+  return [...labelByCategory.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+})
 
 const advancementCategoryFilterItems = computed(() => [
   { label: 'Alle', value: null },
-  ...advancementCategories.value.map(category => ({ label: category, value: category }))
+  ...advancementCategoryOptions.value.map(([category, label]) => ({ label, value: category }))
 ])
 
 const filteredAdvancements = computed(() => {
   const searchQuery = statisticsSearchQuery.value.trim().toLowerCase()
 
   return advancements.value.filter((advancement) => {
-    if (selectedAdvancementCategory.value !== null && advancement.groupLabel !== selectedAdvancementCategory.value) return false
+    if (selectedAdvancementCategory.value !== null && advancement.category !== selectedAdvancementCategory.value) return false
     if (searchQuery.length === 0) return true
-    return `${advancement.groupLabel} ${advancement.label}`.toLowerCase().includes(searchQuery)
+    return advancement.searchText.includes(searchQuery)
   })
 })
 
@@ -139,7 +190,7 @@ const generalStatistics = computed(() =>
 )
 
 const generalStatisticThemeGroups = computed<GeneralStatisticThemeGroup[]>(() => {
-  const statisticsByTheme = new Map<string, StatisticListItemDto[]>()
+  const statisticsByTheme = new Map<string, ResolvedStatistic[]>()
   for (const statistic of generalStatistics.value) {
     const theme = statistic.groupLabel ?? 'Sonstiges'
     const themeStatistics = statisticsByTheme.get(theme) ?? []
@@ -167,16 +218,16 @@ const entityStatistics = computed(() =>
   filteredStatistics.value.filter(statistic => statistic.specificSubgroup === 'entities')
 )
 
-function openStatisticDetail(_event: Event, row: { original: StatisticListItemDto }) {
+function openStatisticDetail(_event: Event, row: { original: ResolvedStatistic }) {
   navigateTo(`/statistiken/${row.original.slug}`)
 }
 
-function openAdvancementDetail(_event: Event, row: { original: AdvancementListItemDto }) {
+function openAdvancementDetail(_event: Event, row: { original: ResolvedAdvancement }) {
   if (row.original.slug === TOTALS_ROW_OBJECT_KEY) return
   navigateTo(`/statistiken/advancements/${row.original.slug}`)
 }
 
-const advancementRows = computed<AdvancementListItemDto[]>(() => {
+const advancementRows = computed<ResolvedAdvancement[]>(() => {
   const advancementsToShow = filteredAdvancements.value
   const totalParticipantCount = advancementsToShow.reduce((sum, advancement) => sum + advancement.participantCount, 0)
   const totalPoints = advancementsToShow.reduce((sum, advancement) => sum + advancement.points, 0)
@@ -184,19 +235,21 @@ const advancementRows = computed<AdvancementListItemDto[]>(() => {
   return [
     {
       slug: TOTALS_ROW_OBJECT_KEY,
+      category: '',
       label: 'Gesamt',
       description: null,
       groupLabel: '',
       participantCount: totalParticipantCount,
       points: totalPoints,
       mostRecentCompletedAt: null,
-      mostRecentCompletedAtDisplay: ''
+      mostRecentCompletedAtDisplay: '',
+      searchText: ''
     },
     ...advancementsToShow
   ]
 })
 
-const advancementTableColumns: TableColumn<AdvancementListItemDto>[] = [
+const advancementTableColumns: TableColumn<ResolvedAdvancement>[] = [
   { accessorKey: 'label', header: 'Advancement', meta: { class: { th: 'h-14' } } },
   { accessorKey: 'groupLabel', header: 'Kategorie', meta: { class: { th: 'text-center', td: 'text-center' } } },
   { accessorKey: 'mostRecentCompletedAtDisplay', header: 'Zuletzt erreicht', meta: { class: { th: 'text-center', td: 'text-center' } } },
@@ -220,7 +273,7 @@ const advancementTableColumns: TableColumn<AdvancementListItemDto>[] = [
 
 const advancementsTableRowMeta = {
   class: {
-    tr: (row: { original: AdvancementListItemDto }) =>
+    tr: (row: { original: ResolvedAdvancement }) =>
       row.original.slug === TOTALS_ROW_OBJECT_KEY ? 'border-b-2 border-default' : ''
   }
 }
@@ -269,7 +322,7 @@ function renderStatisticLeaderCell(slug: string | null, leaders: StatisticLeader
   ])
 }
 
-const generalStatisticTableColumns = computed<TableColumn<StatisticListItemDto>[]>(() => [
+const generalStatisticTableColumns = computed<TableColumn<ResolvedStatistic>[]>(() => [
   { accessorKey: 'label', header: 'Statistik', meta: { class: { th: 'w-1/2', td: 'w-1/2' } } },
   {
     id: 'leader',
@@ -281,59 +334,65 @@ const generalStatisticTableColumns = computed<TableColumn<StatisticListItemDto>[
   }
 ])
 
-function buildPivotedStatisticRows(statisticsToPivot: StatisticListItemDto[]): PivotedStatisticRow[] {
-  const rowsByObjectLabel = new Map<string, PivotedStatisticRow>()
+function buildPivotedStatisticRows(statisticsToPivot: ResolvedStatistic[]): PivotedStatisticRow[] {
+  const rowsByObjectKey = new Map<string, PivotedStatisticRow>()
 
   for (const statistic of statisticsToPivot) {
     if (statistic.groupLabel === null) continue
 
-    const row = rowsByObjectLabel.get(statistic.label)
-      ?? { objectKey: statistic.key, objectLabel: statistic.label, cellsByActionLabel: {}, maxValueAcrossActions: 0, totalValueAcrossActions: 0 }
-    row.cellsByActionLabel[statistic.groupLabel] = {
+    const row = rowsByObjectKey.get(statistic.key)
+      ?? { objectKey: statistic.key, objectLabel: statistic.label, cellsByActionCategory: {}, maxValueAcrossActions: 0, totalValueAcrossActions: 0 }
+    row.cellsByActionCategory[statistic.category] = {
       maxValue: statistic.maxValue,
       maxDisplayValue: statistic.maxDisplayValue,
       totalValue: statistic.totalValue,
       totalDisplayValue: statistic.totalDisplayValue,
       leaders: statistic.leaders
     }
-    rowsByObjectLabel.set(statistic.label, row)
+    rowsByObjectKey.set(statistic.key, row)
   }
 
-  for (const row of rowsByObjectLabel.values()) {
-    row.maxValueAcrossActions = Object.values(row.cellsByActionLabel)
+  for (const row of rowsByObjectKey.values()) {
+    row.maxValueAcrossActions = Object.values(row.cellsByActionCategory)
       .reduce((sum, cell) => sum + (cell?.maxValue ?? 0), 0)
-    row.totalValueAcrossActions = Object.values(row.cellsByActionLabel)
+    row.totalValueAcrossActions = Object.values(row.cellsByActionCategory)
       .reduce((sum, cell) => sum + (cell?.totalValue ?? 0), 0)
   }
 
-  return [...rowsByObjectLabel.values()]
+  return [...rowsByObjectKey.values()]
 }
 
 function buildActionColumns(
-  statisticsToPivot: StatisticListItemDto[],
+  statisticsToPivot: ResolvedStatistic[],
   resolveHeaderIcon: (category: string) => string | null = () => null
 ): TableColumn<PivotedStatisticRow>[] {
   const valueMode = pivotValueMode.value
-  const categoryByActionLabel = new Map<string, string>()
+  const labelByCategory = new Map<string, string>()
+  const totalValueByCategory = new Map<string, number>()
   for (const statistic of statisticsToPivot) {
-    if (statistic.groupLabel !== null) categoryByActionLabel.set(statistic.groupLabel, statistic.category)
+    if (statistic.groupLabel === null) continue
+    labelByCategory.set(statistic.category, statistic.groupLabel)
+    // matches whatever buildTotalsRow shows in the Gesamt row for the active mode, so the column order lines up with it
+    const categoryValue = valueMode === 'max' ? statistic.maxValue : statistic.totalValue
+    totalValueByCategory.set(statistic.category, (totalValueByCategory.get(statistic.category) ?? 0) + categoryValue)
   }
-  const actionLabels = [...categoryByActionLabel.keys()].sort()
+  const categories = sortKeysByTotalDescending(labelByCategory.keys(), category => totalValueByCategory.get(category) ?? 0)
 
-  return actionLabels.map((actionLabel) => {
-    const headerIcon = resolveHeaderIcon(categoryByActionLabel.get(actionLabel)!)
+  return categories.map((category) => {
+    const actionLabel = labelByCategory.get(category)!
+    const headerIcon = resolveHeaderIcon(category)
     const headerContent = renderActionColumnHeaderContent(actionLabel, headerIcon)
 
     return {
-      id: actionLabel,
+      id: category,
       accessorFn: (row: PivotedStatisticRow) => {
-        const cell = row.cellsByActionLabel[actionLabel]
+        const cell = row.cellsByActionCategory[category]
         if (!cell) return 0
         return valueMode === 'max' ? cell.maxValue : cell.totalValue
       },
       header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, headerContent),
       cell: ({ row }: { row: { original: PivotedStatisticRow } }) => {
-        const cell = row.original.cellsByActionLabel[actionLabel]
+        const cell = row.original.cellsByActionCategory[category]
         if (!cell) return '–'
         if (valueMode === 'total') {
           return row.original.objectKey === TOTALS_ROW_OBJECT_KEY
@@ -368,23 +427,23 @@ const pivotTableRowMeta = {
   }
 }
 
-function buildTotalsRow(statisticsToPivot: StatisticListItemDto[]): PivotedStatisticRow {
-  const maxValueSumByActionLabel: Record<string, number> = {}
-  const totalValueSumByActionLabel: Record<string, number> = {}
+function buildTotalsRow(statisticsToPivot: ResolvedStatistic[]): PivotedStatisticRow {
+  const maxValueSumByCategory: Record<string, number> = {}
+  const totalValueSumByCategory: Record<string, number> = {}
   for (const statistic of statisticsToPivot) {
     if (statistic.groupLabel === null) continue
-    maxValueSumByActionLabel[statistic.groupLabel] = (maxValueSumByActionLabel[statistic.groupLabel] ?? 0) + statistic.maxValue
-    totalValueSumByActionLabel[statistic.groupLabel] = (totalValueSumByActionLabel[statistic.groupLabel] ?? 0) + statistic.totalValue
+    maxValueSumByCategory[statistic.category] = (maxValueSumByCategory[statistic.category] ?? 0) + statistic.maxValue
+    totalValueSumByCategory[statistic.category] = (totalValueSumByCategory[statistic.category] ?? 0) + statistic.totalValue
   }
 
   return {
     objectKey: TOTALS_ROW_OBJECT_KEY,
     objectLabel: 'Gesamt',
-    cellsByActionLabel: Object.fromEntries(
-      Object.keys(maxValueSumByActionLabel).map((actionLabel) => {
-        const maxValue = maxValueSumByActionLabel[actionLabel]!
-        const totalValue = totalValueSumByActionLabel[actionLabel]!
-        return [actionLabel, {
+    cellsByActionCategory: Object.fromEntries(
+      Object.keys(maxValueSumByCategory).map((category) => {
+        const maxValue = maxValueSumByCategory[category]!
+        const totalValue = totalValueSumByCategory[category]!
+        return [category, {
           maxValue,
           maxDisplayValue: maxValue.toLocaleString('de-DE'),
           totalValue,
@@ -393,8 +452,8 @@ function buildTotalsRow(statisticsToPivot: StatisticListItemDto[]): PivotedStati
         }]
       })
     ),
-    maxValueAcrossActions: Object.values(maxValueSumByActionLabel).reduce((sum, value) => sum + value, 0),
-    totalValueAcrossActions: Object.values(totalValueSumByActionLabel).reduce((sum, value) => sum + value, 0)
+    maxValueAcrossActions: Object.values(maxValueSumByCategory).reduce((sum, value) => sum + value, 0),
+    totalValueAcrossActions: Object.values(totalValueSumByCategory).reduce((sum, value) => sum + value, 0)
   }
 }
 
@@ -522,7 +581,7 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
             :data="advancementRows"
             :columns="advancementTableColumns"
             :meta="advancementsTableRowMeta"
-            :get-row-id="(row: AdvancementListItemDto) => row.slug"
+            :get-row-id="(row: ResolvedAdvancement) => row.slug"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
             @select="openAdvancementDetail"
           >

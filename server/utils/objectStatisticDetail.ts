@@ -11,25 +11,25 @@ export async function buildObjectStatisticDetail(
   if (matchingDefinitions.length === 0) return null
 
   const objectLabel = matchingDefinitions[0]!.label
-  const categoryByActionLabel = Object.fromEntries(
-    matchingDefinitions.map(definition => [definition.groupLabel!, definition.category])
+  const categories = matchingDefinitions.map(definition => definition.category)
+  const groupLabelByCategory = Object.fromEntries(
+    matchingDefinitions.map(definition => [definition.category, definition.groupLabel!])
   )
 
   const participants = scoreboard.participants.map(({ participant, statistics }) => {
-    const valueByActionLabel: Record<string, number> = {}
-    const displayValueByActionLabel: Record<string, string> = {}
-    const pointsByActionLabel: Record<string, number> = {}
+    const valueByCategory: Record<string, number> = {}
+    const displayValueByCategory: Record<string, string> = {}
+    const pointsByCategory: Record<string, number> = {}
     let totalValue = 0
     let totalPoints = 0
 
     for (const definition of matchingDefinitions) {
-      const actionLabel = definition.groupLabel!
       const score = statistics.find(entry => entry.statistic.slug === definition.slug)
       const value = score?.value ?? 0
-      valueByActionLabel[actionLabel] = value
-      displayValueByActionLabel[actionLabel] = formatStatisticDisplayValue(definition.key, value)
+      valueByCategory[definition.category] = value
+      displayValueByCategory[definition.category] = formatStatisticDisplayValue(definition.key, value)
       totalValue += value
-      pointsByActionLabel[actionLabel] = score?.points ?? 0
+      pointsByCategory[definition.category] = score?.points ?? 0
       totalPoints += score?.points ?? 0
     }
 
@@ -37,16 +37,16 @@ export async function buildObjectStatisticDetail(
       participantId: participant.id,
       displayName: participant.displayName,
       minecraftUuid: participant.minecraftUuid,
-      valueByActionLabel,
-      displayValueByActionLabel,
+      valueByCategory,
+      displayValueByCategory,
       totalValue,
-      pointsByActionLabel,
+      pointsByCategory,
       totalPoints
     }
   })
 
   return {
     asOf: scoreboard.asOf,
-    payload: { objectKey, objectLabel, categoryByActionLabel, participants }
+    payload: { objectKey, objectLabel, categories, groupLabelByCategory, participants }
   }
 }

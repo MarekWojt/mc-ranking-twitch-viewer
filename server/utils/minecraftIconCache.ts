@@ -64,6 +64,15 @@ async function resolveCachedIcon(cacheKey: string, sourceUrl: string): Promise<B
   return downloadResult.bytes
 }
 
+const inFlightCachedIconRequestsByCacheKey = new Map<string, Promise<Buffer | null>>()
+
 export function getOrDownloadCachedIcon(cacheKey: string, sourceUrl: string): Promise<Buffer | null> {
-  return minecraftIconRequestQueue(() => resolveCachedIcon(cacheKey, sourceUrl))
+  const inFlightRequest = inFlightCachedIconRequestsByCacheKey.get(cacheKey)
+  if (inFlightRequest) return inFlightRequest
+
+  const request = minecraftIconRequestQueue(() => resolveCachedIcon(cacheKey, sourceUrl))
+    .finally(() => inFlightCachedIconRequestsByCacheKey.delete(cacheKey))
+
+  inFlightCachedIconRequestsByCacheKey.set(cacheKey, request)
+  return request
 }

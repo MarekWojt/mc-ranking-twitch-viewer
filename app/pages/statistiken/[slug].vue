@@ -12,7 +12,17 @@ if (!response.value) {
 
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 
-const statistic = computed(() => response.value?.payload ?? null)
+const { resolvedObjectsLocale, resolvedStatisticsLocale } = useMinecraftNameLocale()
+
+const statistic = computed(() => {
+  const rawStatistic = response.value?.payload
+  if (!rawStatistic) return null
+
+  return {
+    ...rawStatistic,
+    ...resolveStatisticLabelAndGroupLabel(rawStatistic, resolvedObjectsLocale.value, resolvedStatisticsLocale.value)
+  }
+})
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
 const statisticParticipantTableColumns: TableColumn<StatisticParticipantRowDto>[] = [

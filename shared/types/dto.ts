@@ -15,9 +15,9 @@ export interface ParticipantStatisticRowDto {
   slug: string
   key: string
   category: string
-  label: string
+  label: LocalizedLabel
   group: StatisticGroup
-  groupLabel: string | null
+  groupLabel: LocalizedLabel | null
   specificSubgroup: SpecificStatisticSubgroup | null
   value: number
   displayValue: string
@@ -26,9 +26,10 @@ export interface ParticipantStatisticRowDto {
 
 export interface ParticipantAdvancementRowDto {
   slug: string
-  label: string
-  description: string | null
-  groupLabel: string
+  category: string
+  label: LocalizedLabel
+  description: LocalizedOptionalText | null
+  groupLabel: LocalizedLabel
   points: number
   completedAt: string | null
   completedAtDisplay: string
@@ -50,9 +51,9 @@ export interface StatisticListItemDto {
   slug: string
   key: string
   category: string
-  label: string
+  label: LocalizedLabel
   group: StatisticGroup
-  groupLabel: string | null
+  groupLabel: LocalizedLabel | null
   specificSubgroup: SpecificStatisticSubgroup | null
   maxValue: number
   maxDisplayValue: string
@@ -72,9 +73,9 @@ export interface StatisticParticipantRowDto {
 
 export interface StatisticDetailDto {
   slug: string
-  label: string
+  label: LocalizedLabel
   group: StatisticGroup
-  groupLabel: string | null
+  groupLabel: LocalizedLabel | null
   totalValue: number
   totalDisplayValue: string
   totalPoints: number
@@ -91,25 +92,27 @@ export interface ObjectStatisticParticipantRowDto {
   participantId: string
   displayName: string
   minecraftUuid: string
-  valueByActionLabel: Record<string, number>
-  displayValueByActionLabel: Record<string, string>
+  valueByCategory: Record<string, number>
+  displayValueByCategory: Record<string, string>
   totalValue: number
-  pointsByActionLabel: Record<string, number>
+  pointsByCategory: Record<string, number>
   totalPoints: number
 }
 
 export interface ObjectStatisticDetailDto {
   objectKey: string
-  objectLabel: string
-  categoryByActionLabel: Record<string, string>
+  objectLabel: LocalizedLabel
+  categories: string[]
+  groupLabelByCategory: Record<string, LocalizedLabel>
   participants: ObjectStatisticParticipantRowDto[]
 }
 
 export interface AdvancementListItemDto {
   slug: string
-  label: string
-  description: string | null
-  groupLabel: string
+  category: string
+  label: LocalizedLabel
+  description: LocalizedOptionalText | null
+  groupLabel: LocalizedLabel
   participantCount: number
   points: number
   mostRecentCompletedAt: string | null
@@ -127,9 +130,9 @@ export interface AdvancementParticipantRowDto {
 
 export interface AdvancementDetailDto {
   slug: string
-  label: string
-  description: string | null
-  groupLabel: string
+  label: LocalizedLabel
+  description: LocalizedOptionalText | null
+  groupLabel: LocalizedLabel
   participantCount: number
   points: number
   participants: AdvancementParticipantRowDto[]

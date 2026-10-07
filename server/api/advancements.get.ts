@@ -9,6 +9,7 @@ export default defineEventHandler(async (): Promise<DataWithFreshness<Advancemen
     ))
     .map(({ scoredAdvancement, mostRecentCompletedAt }): AdvancementListItemDto => ({
       slug: scoredAdvancement.definition.slug,
+      category: scoredAdvancement.definition.category,
       label: scoredAdvancement.definition.label,
       description: scoredAdvancement.definition.description,
       groupLabel: scoredAdvancement.definition.groupLabel,

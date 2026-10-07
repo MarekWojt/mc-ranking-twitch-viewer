@@ -12,7 +12,21 @@ if (!response.value) {
 
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 
-const advancement = computed(() => response.value?.payload ?? null)
+const { resolvedAdvancementsLocale } = useMinecraftNameLocale()
+
+// single place where the raw bilingual API payload is resolved into plain display strings for the currently selected locale - everything below this point works with plain strings only
+const advancement = computed(() => {
+  const rawAdvancement = response.value?.payload
+  if (!rawAdvancement) return null
+
+  const locale = resolvedAdvancementsLocale.value
+  return {
+    ...rawAdvancement,
+    label: resolveLocalizedLabel(rawAdvancement.label, locale),
+    description: rawAdvancement.description ? resolveLocalizedOptionalText(rawAdvancement.description, locale) : null,
+    groupLabel: resolveLocalizedLabel(rawAdvancement.groupLabel, locale)
+  }
+})
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
 const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')

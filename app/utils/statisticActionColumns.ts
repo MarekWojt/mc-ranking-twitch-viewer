@@ -16,6 +16,10 @@ export const ENTITY_ACTION_ICON_BY_CATEGORY: Record<string, string> = {
 
 export type SortableColumn = { getIsSorted: () => false | 'asc' | 'desc', toggleSorting: () => void }
 
+export function sortKeysByTotalDescending(keys: Iterable<string>, totalOf: (key: string) => number): string[] {
+  return [...keys].sort((a, b) => totalOf(b) - totalOf(a))
+}
+
 export function renderSortableColumnHeader(column: SortableColumn, content: VNodeChild) {
   const sortDirection = column.getIsSorted()
   const sortIndicator = sortDirection === 'asc' ? '↑' : sortDirection === 'desc' ? '↓' : '↕'

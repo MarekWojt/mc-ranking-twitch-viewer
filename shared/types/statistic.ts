@@ -6,7 +6,7 @@ export interface StatisticDefinition {
   category: string
   key: string
   group: StatisticGroup
-  groupLabel: string | null
+  groupLabel: LocalizedLabel | null
   specificSubgroup: SpecificStatisticSubgroup | null
-  label: string
+  label: LocalizedLabel
 }

@@ -20,43 +20,59 @@ function classifySpecificStatisticSubgroup(category: string): SpecificStatisticS
   return null
 }
 
-export interface VanillaStatisticDisplayNames {
+export interface VanillaStatisticDisplayNamesByLocale {
   itemNamesByBareId: Record<string, string>
   entityNamesByBareId: Record<string, string>
   statisticNamesByKey: Record<string, string>
   statisticTypeNamesByKey: Record<string, string>
 }
 
+export interface VanillaStatisticDisplayNames {
+  en: VanillaStatisticDisplayNamesByLocale
+  de: VanillaStatisticDisplayNamesByLocale
+}
+
 function resolveOfficialStatisticLabel(
-  category: string,
   key: string,
   isGeneralStatistic: boolean,
   specificSubgroup: SpecificStatisticSubgroup | null,
-  vanillaDisplayNames: VanillaStatisticDisplayNames
+  namesByLocale: VanillaStatisticDisplayNamesByLocale
 ): string | undefined {
   const bareKey = stripMinecraftNamespace(key)
 
-  if (isGeneralStatistic) return vanillaDisplayNames.statisticNamesByKey[bareKey]
-  if (specificSubgroup === 'items') return vanillaDisplayNames.itemNamesByBareId[bareKey]
-  if (specificSubgroup === 'entities') return vanillaDisplayNames.entityNamesByBareId[bareKey]
+  if (isGeneralStatistic) return namesByLocale.statisticNamesByKey[bareKey]
+  if (specificSubgroup === 'items') return namesByLocale.itemNamesByBareId[bareKey]
+  if (specificSubgroup === 'entities') return namesByLocale.entityNamesByBareId[bareKey]
   return undefined
 }
 
 export function buildStatisticDefinition(category: string, key: string, vanillaDisplayNames: VanillaStatisticDisplayNames): StatisticDefinition {
   const isGeneralStatistic = category === GENERAL_STATISTIC_CATEGORY
   const specificSubgroup = isGeneralStatistic ? null : classifySpecificStatisticSubgroup(category)
-  const officialLabel = resolveOfficialStatisticLabel(category, key, isGeneralStatistic, specificSubgroup, vanillaDisplayNames)
+
+  const officialLabelEn = resolveOfficialStatisticLabel(key, isGeneralStatistic, specificSubgroup, vanillaDisplayNames.en)
+  const officialLabelDe = resolveOfficialStatisticLabel(key, isGeneralStatistic, specificSubgroup, vanillaDisplayNames.de)
+
+  // the "Allgemein" theme grouping (e.g. "Generell") is our own fixed German UI taxonomy, not Minecraft content,
+  // so it intentionally ignores the locale setting by using the same text for both en/de
+  const generalTheme = isGeneralStatistic ? classifyGeneralStatisticTheme(key) : null
+  const officialGroupLabelEn = generalTheme ?? vanillaDisplayNames.en.statisticTypeNamesByKey[stripMinecraftNamespace(category)]
+  const officialGroupLabelDe = generalTheme ?? vanillaDisplayNames.de.statisticTypeNamesByKey[stripMinecraftNamespace(category)]
 
   return {
     slug: encodeStatisticSlug(category, key),
     category,
     key,
     group: isGeneralStatistic ? 'allgemein' : 'spezifisch',
-    groupLabel: isGeneralStatistic
-      ? classifyGeneralStatisticTheme(key)
-      : vanillaDisplayNames.statisticTypeNamesByKey[stripMinecraftNamespace(category)] ?? humanizeMinecraftId(category),
+    groupLabel: {
+      en: officialGroupLabelEn ?? humanizeMinecraftId(category),
+      de: officialGroupLabelDe ?? null
+    },
     specificSubgroup,
-    label: officialLabel ?? humanizeMinecraftId(key)
+    label: {
+      en: officialLabelEn ?? humanizeMinecraftId(key),
+      de: officialLabelDe ?? null
+    }
   }
 }
 

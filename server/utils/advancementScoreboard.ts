@@ -39,11 +39,13 @@ export function compareAdvancementsByRarityThenRecency(
 }
 
 export async function computeAdvancementScoreboard(): Promise<AdvancementScoreboard> {
-  const [participantsResult, advancementsResult, vanillaTextByAdvancementId] = await Promise.all([
+  const [participantsResult, advancementsResult, vanillaTextByAdvancementIdEn, vanillaTextByAdvancementIdDe] = await Promise.all([
     loadParticipants(),
     loadAllPlayerAdvancements(),
-    loadVanillaAdvancementTextByAdvancementId()
+    loadVanillaAdvancementTextByAdvancementId('en'),
+    loadVanillaAdvancementTextByAdvancementId('de')
   ])
+  const vanillaTextByAdvancementIdByLocale: VanillaAdvancementTextByLocale = { en: vanillaTextByAdvancementIdEn, de: vanillaTextByAdvancementIdDe }
 
   const participants = participantsResult.value
   const completedAdvancementsByMinecraftUuid = advancementsResult.value
@@ -61,7 +63,7 @@ export async function computeAdvancementScoreboard(): Promise<AdvancementScorebo
   const advancements: ScoredAdvancement[] = [...completedAtByParticipantIdByAdvancementId.entries()].map(([advancementId, completedAtByParticipantId]) => {
     const participantCount = Object.keys(completedAtByParticipantId).length
     return {
-      definition: buildAdvancementDefinition(advancementId, vanillaTextByAdvancementId),
+      definition: buildAdvancementDefinition(advancementId, vanillaTextByAdvancementIdByLocale),
       participantCount,
       points: calculateAdvancementPoints(participantCount),
       completedAtByParticipantId

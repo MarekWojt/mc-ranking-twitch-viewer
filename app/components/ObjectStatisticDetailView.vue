@@ -6,6 +6,25 @@ const props = defineProps<{
   bareKey: string
 }>()
 
+interface ResolvedObjectStatisticParticipantRow {
+  participantId: string
+  displayName: string
+  minecraftUuid: string
+  valueByCategory: Record<string, number>
+  displayValueByCategory: Record<string, string>
+  totalValue: number
+  pointsByCategory: Record<string, number>
+  totalPoints: number
+}
+
+interface ResolvedObjectStatisticDetail {
+  objectKey: string
+  objectLabel: string
+  categories: string[]
+  labelByCategory: Record<string, string>
+  participants: ResolvedObjectStatisticParticipantRow[]
+}
+
 const { data: response, refresh } = await useFetch<DataWithFreshness<ObjectStatisticDetailDto>>(
   () => `/api/statistics/${props.kind}/${props.bareKey}`
 )
@@ -16,7 +35,25 @@ if (!response.value) {
 
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 
-const detail = computed(() => response.value?.payload ?? null)
+// the object name (item/entity identity) follows "Items & Entities"; the per-category column headers follow "Statistiken"
+const { resolvedObjectsLocale, resolvedStatisticsLocale } = useMinecraftNameLocale()
+
+// single place where the raw bilingual API payload is resolved into plain display strings for the currently selected locale - everything below this point works with plain strings only
+const detail = computed<ResolvedObjectStatisticDetail | null>(() => {
+  const rawDetail = response.value?.payload
+  if (!rawDetail) return null
+
+  return {
+    objectKey: rawDetail.objectKey,
+    objectLabel: resolveLocalizedLabel(rawDetail.objectLabel, resolvedObjectsLocale.value),
+    categories: rawDetail.categories,
+    labelByCategory: Object.fromEntries(
+      rawDetail.categories.map(category => [category, resolveLocalizedLabel(rawDetail.groupLabelByCategory[category]!, resolvedStatisticsLocale.value)])
+    ),
+    participants: rawDetail.participants
+  }
+})
+
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
 const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
@@ -27,19 +64,9 @@ const iconSrc = computed(() => props.kind === 'items'
 
 const actionIconByCategory = computed(() => props.kind === 'items' ? ITEM_ACTION_ICON_BY_CATEGORY : ENTITY_ACTION_ICON_BY_CATEGORY)
 
-function resolveActionIcon(actionLabel: string): string | null {
-  const category = detail.value?.categoryByActionLabel[actionLabel]
-  if (!category) return null
+function resolveActionIcon(category: string): string | null {
   return actionIconByCategory.value[stripMinecraftNamespace(category)] ?? null
 }
-
-const actionLabels = computed(() => {
-  const labels = new Set<string>()
-  for (const participant of detail.value?.participants ?? []) {
-    for (const label of Object.keys(participant.valueByActionLabel)) labels.add(label)
-  }
-  return [...labels].sort()
-})
 
 const TOTALS_ROW_PARTICIPANT_ID = '__totals__'
 
@@ -47,35 +74,43 @@ type StatDisplayMode = 'value' | 'points'
 
 const statDisplayMode = ref<StatDisplayMode>('value')
 
-const tableColumns = computed<TableColumn<ObjectStatisticParticipantRowDto>[]>(() => {
+const tableColumns = computed<TableColumn<ResolvedObjectStatisticParticipantRow>[]>(() => {
   const displayMode = statDisplayMode.value
+  const labelByCategory = detail.value?.labelByCategory ?? {}
+  const participants = detail.value?.participants ?? []
+  // matches whatever the Gesamt row shows for the active mode, so the column order lines up with it
+  const categories = sortKeysByTotalDescending(
+    detail.value?.categories ?? [],
+    category => participants.reduce((sum, participant) =>
+      sum + (displayMode === 'value' ? (participant.valueByCategory[category] ?? 0) : (participant.pointsByCategory[category] ?? 0)), 0)
+  )
 
   return [
     { accessorKey: 'displayName', header: 'Spieler', enableSorting: false },
-    ...actionLabels.value.map((actionLabel): TableColumn<ObjectStatisticParticipantRowDto> => ({
-      id: actionLabel,
-      accessorFn: (row: ObjectStatisticParticipantRowDto) =>
-        displayMode === 'value' ? (row.valueByActionLabel[actionLabel] ?? 0) : (row.pointsByActionLabel[actionLabel] ?? 0),
+    ...categories.map((category): TableColumn<ResolvedObjectStatisticParticipantRow> => ({
+      id: category,
+      accessorFn: (row: ResolvedObjectStatisticParticipantRow) =>
+        displayMode === 'value' ? (row.valueByCategory[category] ?? 0) : (row.pointsByCategory[category] ?? 0),
       header: ({ column }: { column: SortableColumn }) =>
-        renderSortableColumnHeader(column, renderActionColumnHeaderContent(actionLabel, resolveActionIcon(actionLabel))),
-      cell: ({ row }: { row: { original: ObjectStatisticParticipantRowDto } }) => {
+        renderSortableColumnHeader(column, renderActionColumnHeaderContent(labelByCategory[category]!, resolveActionIcon(category))),
+      cell: ({ row }: { row: { original: ResolvedObjectStatisticParticipantRow } }) => {
         const isTotalsRow = row.original.participantId === TOTALS_ROW_PARTICIPANT_ID
 
         if (displayMode === 'points') {
-          const points = Math.round(row.original.pointsByActionLabel[actionLabel] ?? 0)
+          const points = Math.round(row.original.pointsByCategory[category] ?? 0)
           if (!isTotalsRow && points === 0) return '–'
           return isTotalsRow ? renderBoldTabularNumber(points) : h('span', { class: 'text-sm tabular-nums' }, points.toLocaleString('de-DE'))
         }
 
-        const value = row.original.valueByActionLabel[actionLabel] ?? 0
+        const value = row.original.valueByCategory[category] ?? 0
         if (isTotalsRow) return renderBoldTabularNumber(value)
         if (value === 0) return '–'
-        return h('span', { class: 'text-sm tabular-nums' }, row.original.displayValueByActionLabel[actionLabel] ?? value.toLocaleString('de-DE'))
+        return h('span', { class: 'text-sm tabular-nums' }, row.original.displayValueByCategory[category] ?? value.toLocaleString('de-DE'))
       }
     })),
     {
       id: 'total',
-      accessorFn: (row: ObjectStatisticParticipantRowDto) => displayMode === 'value' ? row.totalValue : row.totalPoints,
+      accessorFn: (row: ResolvedObjectStatisticParticipantRow) => displayMode === 'value' ? row.totalValue : row.totalPoints,
       header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, 'Gesamt'),
       cell: ({ row }) => renderBoldTabularNumber(displayMode === 'value' ? row.original.totalValue : Math.round(row.original.totalPoints))
     }
@@ -84,27 +119,27 @@ const tableColumns = computed<TableColumn<ObjectStatisticParticipantRowDto>[]>((
 
 const tableInitialState = { sorting: [{ id: 'total', desc: true }] }
 
-const participantRows = computed<ObjectStatisticParticipantRowDto[]>(() => {
+const participantRows = computed<ResolvedObjectStatisticParticipantRow[]>(() => {
   void statDisplayMode.value // force a fresh data reference on toggle so the table's sorted row model re-runs, not just the columns
 
   if (!detail.value) return []
 
-  const valueByActionLabel: Record<string, number> = {}
-  const pointsByActionLabel: Record<string, number> = {}
-  for (const actionLabel of actionLabels.value) {
-    valueByActionLabel[actionLabel] = detail.value.participants.reduce((sum, participant) => sum + (participant.valueByActionLabel[actionLabel] ?? 0), 0)
-    pointsByActionLabel[actionLabel] = detail.value.participants.reduce((sum, participant) => sum + (participant.pointsByActionLabel[actionLabel] ?? 0), 0)
+  const valueByCategory: Record<string, number> = {}
+  const pointsByCategory: Record<string, number> = {}
+  for (const category of detail.value.categories) {
+    valueByCategory[category] = detail.value.participants.reduce((sum, participant) => sum + (participant.valueByCategory[category] ?? 0), 0)
+    pointsByCategory[category] = detail.value.participants.reduce((sum, participant) => sum + (participant.pointsByCategory[category] ?? 0), 0)
   }
 
-  const totalsRow: ObjectStatisticParticipantRowDto = {
+  const totalsRow: ResolvedObjectStatisticParticipantRow = {
     participantId: TOTALS_ROW_PARTICIPANT_ID,
     displayName: 'Gesamt',
     minecraftUuid: '',
-    valueByActionLabel,
-    displayValueByActionLabel: {},
-    totalValue: Object.values(valueByActionLabel).reduce((sum, value) => sum + value, 0),
-    pointsByActionLabel,
-    totalPoints: Object.values(pointsByActionLabel).reduce((sum, points) => sum + points, 0)
+    valueByCategory,
+    displayValueByCategory: {},
+    totalValue: Object.values(valueByCategory).reduce((sum, value) => sum + value, 0),
+    pointsByCategory,
+    totalPoints: Object.values(pointsByCategory).reduce((sum, points) => sum + points, 0)
   }
 
   return [totalsRow, ...detail.value.participants]
@@ -112,12 +147,12 @@ const participantRows = computed<ObjectStatisticParticipantRowDto[]>(() => {
 
 const participantTableRowMeta = {
   class: {
-    tr: (row: { original: ObjectStatisticParticipantRowDto }) =>
+    tr: (row: { original: ResolvedObjectStatisticParticipantRow }) =>
       row.original.participantId === TOTALS_ROW_PARTICIPANT_ID ? 'border-b-2 border-default' : ''
   }
 }
 
-function openParticipantDetail(_event: Event, row: { original: ObjectStatisticParticipantRowDto }) {
+function openParticipantDetail(_event: Event, row: { original: ResolvedObjectStatisticParticipantRow }) {
   if (row.original.participantId === TOTALS_ROW_PARTICIPANT_ID) return
   navigateTo(`/teilnehmer/${row.original.participantId}`)
 }
@@ -166,7 +201,7 @@ function openParticipantDetail(_event: Event, row: { original: ObjectStatisticPa
       :data="participantRows"
       :columns="tableColumns"
       :meta="participantTableRowMeta"
-      :get-row-id="(row: ObjectStatisticParticipantRowDto) => row.participantId"
+      :get-row-id="(row: ResolvedObjectStatisticParticipantRow) => row.participantId"
       :row-pinning="{ top: [TOTALS_ROW_PARTICIPANT_ID] }"
       :initial-state="tableInitialState"
       @select="openParticipantDetail"

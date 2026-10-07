@@ -7,12 +7,12 @@ export interface VanillaAdvancementText {
 
 const advancementTextCacheOptions = {
   name: 'advancement-text',
-  getKey: () => 'all',
+  getKey: (locale: MinecraftLocale) => locale,
   maxAge: 86400
 }
 
-export const loadVanillaAdvancementTextByAdvancementId = defineCachedFunction(async (): Promise<Record<string, Partial<VanillaAdvancementText>>> => {
-  const allTranslationsByKey = await loadVanillaLanguageFile()
+export const loadVanillaAdvancementTextByAdvancementId = defineCachedFunction(async (locale: MinecraftLocale): Promise<Record<string, Partial<VanillaAdvancementText>>> => {
+  const allTranslationsByKey = await loadVanillaLanguageFile(locale)
   const textByAdvancementId: Record<string, Partial<VanillaAdvancementText>> = {}
 
   for (const [translationKey, translation] of Object.entries(allTranslationsByKey)) {

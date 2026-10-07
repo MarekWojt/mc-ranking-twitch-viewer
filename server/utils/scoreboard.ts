@@ -38,7 +38,7 @@ async function loadOrFallback<T>(loadValue: () => Promise<TimestampedValue<T>>, 
 export async function computeScoreboard(): Promise<Scoreboard> {
   const [
     participantsResult, statsResult, onlineStatusResult, liveStreamsResult, profileImageUrlsResult, advancementScoreboard,
-    vanillaItemNamesByBareId, vanillaEntityNamesByBareId, vanillaStatisticNamesByKey, vanillaStatisticTypeNamesByKey
+    vanillaDisplayNamesEn, vanillaDisplayNamesDe
   ] = await Promise.all([
     loadParticipants(),
     loadAllPlayerStats(),
@@ -46,10 +46,8 @@ export async function computeScoreboard(): Promise<Scoreboard> {
     loadOrFallback(getLiveTwitchStreamsByLogin, {}, 'Twitch-Live-Status konnte nicht abgerufen werden, alle Teilnehmer gelten als nicht live:'),
     loadOrFallback(getTwitchProfileImageUrlsByLogin, {}, 'Twitch-Profilbilder konnten nicht abgerufen werden:'),
     computeAdvancementScoreboard(),
-    loadVanillaItemNamesByBareId(),
-    loadVanillaEntityNamesByBareId(),
-    loadVanillaStatisticNamesByKey(),
-    loadVanillaStatisticTypeNamesByKey()
+    loadVanillaStatisticDisplayNamesByLocale('en'),
+    loadVanillaStatisticDisplayNamesByLocale('de')
   ])
 
   const participants = participantsResult.value
@@ -67,12 +65,7 @@ export async function computeScoreboard(): Promise<Scoreboard> {
   ])
 
   const onlinePlayerUuidSet = new Set(onlinePlayerUuids)
-  const statisticDefinitions = collectStatisticDefinitions(statsByMinecraftUuid, {
-    itemNamesByBareId: vanillaItemNamesByBareId,
-    entityNamesByBareId: vanillaEntityNamesByBareId,
-    statisticNamesByKey: vanillaStatisticNamesByKey,
-    statisticTypeNamesByKey: vanillaStatisticTypeNamesByKey
-  })
+  const statisticDefinitions = collectStatisticDefinitions(statsByMinecraftUuid, { en: vanillaDisplayNamesEn, de: vanillaDisplayNamesDe })
 
   buildMinecraftIconBundle(statisticDefinitions, advancementScoreboard.advancements.map(scoredAdvancement => scoredAdvancement.definition)).catch((error) => {
     console.error('Vorab-Laden der Minecraft-Icons im Hintergrund fehlgeschlagen:', error)
