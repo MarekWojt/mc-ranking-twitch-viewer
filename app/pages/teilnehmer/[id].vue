@@ -44,6 +44,10 @@ function findEntityIconSrc(minecraftKey: string): string | null {
   return iconBundle.value?.entityIconsByBareId[stripMinecraftNamespace(minecraftKey)] ?? null
 }
 
+function findAdvancementIconSrc(slug: string): string | null {
+  return iconBundle.value?.advancementIconsBySlug[slug] ?? null
+}
+
 const twitchChannelUrl = computed(() =>
   participant.value?.twitchLogin ? `https://twitch.tv/${participant.value.twitchLogin}` : null
 )
@@ -67,6 +71,28 @@ const filteredStatistics = computed(() => {
 const generalStatistics = computed(() =>
   filteredStatistics.value.filter(statistic => statistic.group === 'allgemein')
 )
+
+const selectedAdvancementCategory = ref<string | null>(null)
+
+const advancementCategories = computed(() =>
+  [...new Set((participant.value?.advancements ?? []).map(advancement => advancement.groupLabel))].sort()
+)
+
+const advancementCategoryFilterItems = computed(() => [
+  { label: 'Alle', value: null },
+  ...advancementCategories.value.map(category => ({ label: category, value: category }))
+])
+
+const filteredAdvancements = computed(() => {
+  const allAdvancements = participant.value?.advancements ?? []
+  const searchQuery = statisticsSearchQuery.value.trim().toLowerCase()
+
+  return allAdvancements.filter((advancement) => {
+    if (selectedAdvancementCategory.value !== null && advancement.groupLabel !== selectedAdvancementCategory.value) return false
+    if (searchQuery.length === 0) return true
+    return `${advancement.groupLabel} ${advancement.label}`.toLowerCase().includes(searchQuery)
+  })
+})
 
 const generalStatisticThemeGroups = computed<GeneralStatisticThemeGroup[]>(() => {
   const statisticsByTheme = new Map<string, ParticipantStatisticRowDto[]>()
@@ -100,7 +126,8 @@ const entityStatistics = computed(() =>
 const statisticTabItems = [
   { label: 'Allgemein', value: 'allgemein', slot: 'allgemein' as const },
   { label: 'Items', value: 'items', slot: 'items' as const },
-  { label: 'Entities', value: 'entities', slot: 'entities' as const }
+  { label: 'Entities', value: 'entities', slot: 'entities' as const },
+  { label: 'Advancements', value: 'advancements', slot: 'advancements' as const }
 ]
 
 const activeStatisticTab = ref('allgemein')
@@ -110,6 +137,42 @@ function openStatisticDetail(_event: Event, row: { original: ParticipantStatisti
 }
 
 const TOTALS_ROW_OBJECT_KEY = '__totals__'
+
+function openAdvancementDetail(_event: Event, row: { original: ParticipantAdvancementRowDto }) {
+  if (row.original.slug === TOTALS_ROW_OBJECT_KEY) return
+  navigateTo(`/statistiken/advancements/${row.original.slug}`)
+}
+
+const advancementRows = computed<ParticipantAdvancementRowDto[]>(() => {
+  const advancements = filteredAdvancements.value
+  const totalPoints = advancements.reduce((sum, advancement) => sum + advancement.points, 0)
+
+  return [
+    { slug: TOTALS_ROW_OBJECT_KEY, label: 'Gesamt', description: null, groupLabel: '', points: totalPoints, completedAt: null, completedAtDisplay: '' },
+    ...advancements
+  ]
+})
+
+const advancementTableColumns: TableColumn<ParticipantAdvancementRowDto>[] = [
+  { accessorKey: 'label', header: 'Advancement', meta: { class: { th: 'h-14' } } },
+  { accessorKey: 'groupLabel', header: 'Kategorie', meta: { class: { th: 'text-center', td: 'text-center' } } },
+  { accessorKey: 'completedAtDisplay', header: 'Erreicht am', meta: { class: { th: 'text-center', td: 'text-center' } } },
+  {
+    accessorKey: 'points',
+    header: 'Punkte',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
+    cell: ({ row }) => row.original.slug === TOTALS_ROW_OBJECT_KEY
+      ? renderBoldTabularNumber(Math.round(row.original.points))
+      : Math.round(row.original.points)
+  }
+]
+
+const advancementsTableRowMeta = {
+  class: {
+    tr: (row: { original: ParticipantAdvancementRowDto }) =>
+      row.original.slug === TOTALS_ROW_OBJECT_KEY ? 'border-b-2 border-default' : ''
+  }
+}
 
 function openItemDetail(_event: Event, row: { original: PivotedParticipantRow }) {
   if (row.original.objectKey === TOTALS_ROW_OBJECT_KEY) return
@@ -304,16 +367,16 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
         v-model="activeStatisticTab"
         :items="statisticTabItems"
         variant="link"
-        :ui="{ content: 'mt-6 min-w-0' }"
+        :ui="{ root: 'gap-0', content: 'min-w-0' }"
       >
         <template #allgemein>
-          <div class="space-y-6">
+          <div class="mt-6 space-y-6">
             <div
               v-for="themeGroup in generalStatisticThemeGroups"
               :key="themeGroup.theme"
-              class="space-y-3"
+              class="space-y-2"
             >
-              <h3 class="text-sm font-medium text-muted">
+              <h3 class="pl-2 text-sm font-semibold text-default">
                 {{ themeGroup.theme }}
               </h3>
               <UTable
@@ -374,9 +437,49 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
             </template>
           </UTable>
         </template>
+
+        <template #advancements>
+          <UTable
+            :data="advancementRows"
+            :columns="advancementTableColumns"
+            :meta="advancementsTableRowMeta"
+            :get-row-id="(row: ParticipantAdvancementRowDto) => row.slug"
+            :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
+            @select="openAdvancementDetail"
+          >
+            <template #label-cell="{ row }">
+              <span
+                v-if="row.original.slug === TOTALS_ROW_OBJECT_KEY"
+                class="text-sm font-medium"
+              >Gesamt</span>
+              <div
+                v-else
+                class="flex items-center gap-2"
+              >
+                <MinecraftObjectIcon
+                  :src="findAdvancementIconSrc(row.original.slug)"
+                  :alt="row.original.label"
+                  kind="item"
+                />
+                <div>
+                  <div>{{ row.original.label }}</div>
+                  <div
+                    v-if="row.original.description"
+                    class="text-xs text-muted"
+                  >
+                    {{ row.original.description }}
+                  </div>
+                </div>
+              </div>
+            </template>
+          </UTable>
+        </template>
       </UTabs>
 
-      <div class="absolute right-0 top-1 flex h-8 items-center gap-3 text-sm">
+      <div
+        v-if="activeStatisticTab !== 'advancements'"
+        class="absolute right-0 top-1 flex h-8 items-center gap-3 text-sm"
+      >
         <button
           type="button"
           class="font-medium transition-colors"
@@ -393,6 +496,18 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
         >
           Punkte
         </button>
+      </div>
+
+      <div
+        v-if="activeStatisticTab === 'advancements'"
+        class="absolute right-0 top-1 flex h-8 items-center"
+      >
+        <USelect
+          v-model="selectedAdvancementCategory"
+          :items="advancementCategoryFilterItems"
+          size="sm"
+          class="w-36"
+        />
       </div>
     </div>
   </UContainer>

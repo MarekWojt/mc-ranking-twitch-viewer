@@ -15,6 +15,7 @@ export default defineNuxtConfig({
     twitchClientId: '',
     twitchClientSecret: '',
     minecraftStatsDirectoryPath: '',
+    minecraftAdvancementsDirectoryPath: '',
     minecraftOnlinePlayersFilePath: '',
     twitchLiveStatusCacheTtlSeconds: 30,
     minecraftOnlineStatusCacheTtlSeconds: 15,

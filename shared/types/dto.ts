@@ -23,9 +23,20 @@ export interface ParticipantStatisticRowDto {
   points: number
 }
 
+export interface ParticipantAdvancementRowDto {
+  slug: string
+  label: string
+  description: string | null
+  groupLabel: string
+  points: number
+  completedAt: string | null
+  completedAtDisplay: string
+}
+
 export interface ParticipantDetailDto extends ParticipantListItemDto {
   twitchStreamTitle: string | null
   statistics: ParticipantStatisticRowDto[]
+  advancements: ParticipantAdvancementRowDto[]
 }
 
 export interface StatisticLeaderDto {
@@ -71,6 +82,7 @@ export interface StatisticDetailDto {
 export interface MinecraftIconBundleDto {
   itemIconsByBareId: Record<string, string>
   entityIconsByBareId: Record<string, string>
+  advancementIconsBySlug: Record<string, string>
 }
 
 export interface ObjectStatisticParticipantRowDto {
@@ -88,4 +100,34 @@ export interface ObjectStatisticDetailDto {
   objectKey: string
   objectLabel: string
   participants: ObjectStatisticParticipantRowDto[]
+}
+
+export interface AdvancementListItemDto {
+  slug: string
+  label: string
+  description: string | null
+  groupLabel: string
+  participantCount: number
+  points: number
+  mostRecentCompletedAt: string | null
+  mostRecentCompletedAtDisplay: string
+}
+
+export interface AdvancementParticipantRowDto {
+  participantId: string
+  displayName: string
+  minecraftUuid: string
+  points: number
+  completedAt: string | null
+  completedAtDisplay: string
+}
+
+export interface AdvancementDetailDto {
+  slug: string
+  label: string
+  description: string | null
+  groupLabel: string
+  participantCount: number
+  points: number
+  participants: AdvancementParticipantRowDto[]
 }

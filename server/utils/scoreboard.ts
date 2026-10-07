@@ -22,7 +22,7 @@ export interface Scoreboard {
   participants: ScoredParticipant[]
 }
 
-function toOldestFetchedAt(fetchedAtTimestamps: string[]): string {
+export function toOldestFetchedAt(fetchedAtTimestamps: string[]): string {
   return [...fetchedAtTimestamps].sort()[0]!
 }
 
@@ -36,12 +36,13 @@ async function loadOrFallback<T>(loadValue: () => Promise<TimestampedValue<T>>, 
 }
 
 export async function computeScoreboard(): Promise<Scoreboard> {
-  const [participantsResult, statsResult, onlineStatusResult, liveStreamsResult, profileImageUrlsResult] = await Promise.all([
+  const [participantsResult, statsResult, onlineStatusResult, liveStreamsResult, profileImageUrlsResult, advancementScoreboard] = await Promise.all([
     loadParticipants(),
     loadAllPlayerStats(),
     getOnlinePlayerUuids(),
     loadOrFallback(getLiveTwitchStreamsByLogin, {}, 'Twitch-Live-Status konnte nicht abgerufen werden, alle Teilnehmer gelten als nicht live:'),
-    loadOrFallback(getTwitchProfileImageUrlsByLogin, {}, 'Twitch-Profilbilder konnten nicht abgerufen werden:')
+    loadOrFallback(getTwitchProfileImageUrlsByLogin, {}, 'Twitch-Profilbilder konnten nicht abgerufen werden:'),
+    computeAdvancementScoreboard()
   ])
 
   const participants = participantsResult.value
@@ -54,13 +55,14 @@ export async function computeScoreboard(): Promise<Scoreboard> {
     statsResult.fetchedAt,
     onlineStatusResult.fetchedAt,
     liveStreamsResult.fetchedAt,
-    profileImageUrlsResult.fetchedAt
+    profileImageUrlsResult.fetchedAt,
+    advancementScoreboard.asOf
   ])
 
   const onlinePlayerUuidSet = new Set(onlinePlayerUuids)
   const statisticDefinitions = collectStatisticDefinitions(statsByMinecraftUuid)
 
-  buildMinecraftIconBundle(statisticDefinitions).catch((error) => {
+  buildMinecraftIconBundle(statisticDefinitions, advancementScoreboard.advancements.map(scoredAdvancement => scoredAdvancement.definition)).catch((error) => {
     console.error('Vorab-Laden der Minecraft-Icons im Hintergrund fehlgeschlagen:', error)
   })
 
@@ -68,7 +70,7 @@ export async function computeScoreboard(): Promise<Scoreboard> {
     participants.map(participant => [participant.id, []])
   )
   const totalScoreByParticipantId = new Map<string, number>(
-    participants.map(participant => [participant.id, 0])
+    participants.map(participant => [participant.id, advancementScoreboard.totalPointsByParticipantId[participant.id] ?? 0])
   )
 
   for (const statisticDefinition of statisticDefinitions) {

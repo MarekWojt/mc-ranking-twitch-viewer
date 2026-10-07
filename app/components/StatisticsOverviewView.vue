@@ -2,7 +2,7 @@
 import type { TableColumn } from '@nuxt/ui'
 
 const props = defineProps<{
-  activeTab: 'allgemein' | 'items' | 'entities'
+  activeTab: 'allgemein' | 'items' | 'entities' | 'advancements'
 }>()
 
 interface PivotedActionCell {
@@ -29,7 +29,8 @@ interface PivotedStatisticRow {
 const statisticTabItems = [
   { label: 'Allgemein', value: 'allgemein', slot: 'allgemein' as const },
   { label: 'Items', value: 'items', slot: 'items' as const },
-  { label: 'Entities', value: 'entities', slot: 'entities' as const }
+  { label: 'Entities', value: 'entities', slot: 'entities' as const },
+  { label: 'Advancements', value: 'advancements', slot: 'advancements' as const }
 ]
 
 const route = useRoute()
@@ -48,9 +49,13 @@ const activeStatisticTab = computed({
 const { data: response, refresh } = await useFetch<DataWithFreshness<StatisticListItemDto[]>>('/api/statistics')
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 
+const { data: advancementsResponse, refresh: refreshAdvancements } = await useFetch<DataWithFreshness<AdvancementListItemDto[]>>('/api/advancements')
+useAutoRefresh(refreshAdvancements, DATA_POLLING_INTERVAL_MILLISECONDS)
+
 const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
 
 const statistics = computed(() => response.value?.payload ?? [])
+const advancements = computed(() => advancementsResponse.value?.payload ?? [])
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
 type PivotValueMode = 'max' | 'total'
@@ -93,6 +98,10 @@ function findEntityIconSrc(minecraftKey: string): string | null {
   return iconBundle.value?.entityIconsByBareId[stripMinecraftNamespace(minecraftKey)] ?? null
 }
 
+function findAdvancementIconSrc(slug: string): string | null {
+  return iconBundle.value?.advancementIconsBySlug[slug] ?? null
+}
+
 const statisticsSearchQuery = ref('')
 
 const filteredStatistics = computed(() => {
@@ -102,6 +111,27 @@ const filteredStatistics = computed(() => {
   return statistics.value.filter(statistic =>
     `${statistic.groupLabel} ${statistic.label}`.toLowerCase().includes(searchQuery)
   )
+})
+
+const selectedAdvancementCategory = ref<string | null>(null)
+
+const advancementCategories = computed(() =>
+  [...new Set(advancements.value.map(advancement => advancement.groupLabel))].sort()
+)
+
+const advancementCategoryFilterItems = computed(() => [
+  { label: 'Alle', value: null },
+  ...advancementCategories.value.map(category => ({ label: category, value: category }))
+])
+
+const filteredAdvancements = computed(() => {
+  const searchQuery = statisticsSearchQuery.value.trim().toLowerCase()
+
+  return advancements.value.filter((advancement) => {
+    if (selectedAdvancementCategory.value !== null && advancement.groupLabel !== selectedAdvancementCategory.value) return false
+    if (searchQuery.length === 0) return true
+    return `${advancement.groupLabel} ${advancement.label}`.toLowerCase().includes(searchQuery)
+  })
 })
 
 const generalStatistics = computed(() =>
@@ -139,6 +169,60 @@ const entityStatistics = computed(() =>
 
 function openStatisticDetail(_event: Event, row: { original: StatisticListItemDto }) {
   navigateTo(`/statistiken/${row.original.slug}`)
+}
+
+function openAdvancementDetail(_event: Event, row: { original: AdvancementListItemDto }) {
+  if (row.original.slug === TOTALS_ROW_OBJECT_KEY) return
+  navigateTo(`/statistiken/advancements/${row.original.slug}`)
+}
+
+const advancementRows = computed<AdvancementListItemDto[]>(() => {
+  const advancementsToShow = filteredAdvancements.value
+  const totalParticipantCount = advancementsToShow.reduce((sum, advancement) => sum + advancement.participantCount, 0)
+  const totalPoints = advancementsToShow.reduce((sum, advancement) => sum + advancement.points, 0)
+
+  return [
+    {
+      slug: TOTALS_ROW_OBJECT_KEY,
+      label: 'Gesamt',
+      description: null,
+      groupLabel: '',
+      participantCount: totalParticipantCount,
+      points: totalPoints,
+      mostRecentCompletedAt: null,
+      mostRecentCompletedAtDisplay: ''
+    },
+    ...advancementsToShow
+  ]
+})
+
+const advancementTableColumns: TableColumn<AdvancementListItemDto>[] = [
+  { accessorKey: 'label', header: 'Advancement', meta: { class: { th: 'h-14' } } },
+  { accessorKey: 'groupLabel', header: 'Kategorie', meta: { class: { th: 'text-center', td: 'text-center' } } },
+  { accessorKey: 'mostRecentCompletedAtDisplay', header: 'Zuletzt erreicht', meta: { class: { th: 'text-center', td: 'text-center' } } },
+  {
+    accessorKey: 'participantCount',
+    header: 'Spieler',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
+    cell: ({ row }) => row.original.slug === TOTALS_ROW_OBJECT_KEY
+      ? renderBoldTabularNumber(row.original.participantCount)
+      : row.original.participantCount
+  },
+  {
+    accessorKey: 'points',
+    header: 'Punkte',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
+    cell: ({ row }) => row.original.slug === TOTALS_ROW_OBJECT_KEY
+      ? renderBoldTabularNumber(Math.round(row.original.points))
+      : Math.round(row.original.points)
+  }
+]
+
+const advancementsTableRowMeta = {
+  class: {
+    tr: (row: { original: AdvancementListItemDto }) =>
+      row.original.slug === TOTALS_ROW_OBJECT_KEY ? 'border-b-2 border-default' : ''
+  }
 }
 
 function openItemDetail(_event: Event, row: { original: PivotedStatisticRow }) {
@@ -360,16 +444,16 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
         v-model="activeStatisticTab"
         :items="statisticTabItems"
         variant="link"
-        :ui="{ content: 'mt-6 min-w-0' }"
+        :ui="{ root: 'gap-0', content: 'min-w-0' }"
       >
         <template #allgemein>
-          <div class="space-y-6">
+          <div class="mt-6 space-y-6">
             <div
               v-for="themeGroup in generalStatisticThemeGroups"
               :key="themeGroup.theme"
-              class="space-y-3"
+              class="space-y-2"
             >
-              <h3 class="text-sm font-medium text-muted">
+              <h3 class="pl-2 text-sm font-semibold text-default">
                 {{ themeGroup.theme }}
               </h3>
               <UTable
@@ -430,9 +514,47 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
             </template>
           </UTable>
         </template>
+
+        <template #advancements>
+          <UTable
+            :data="advancementRows"
+            :columns="advancementTableColumns"
+            :meta="advancementsTableRowMeta"
+            :get-row-id="(row: AdvancementListItemDto) => row.slug"
+            :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
+            @select="openAdvancementDetail"
+          >
+            <template #label-cell="{ row }">
+              <span
+                v-if="row.original.slug === TOTALS_ROW_OBJECT_KEY"
+                class="text-sm font-medium"
+              >Gesamt</span>
+              <div
+                v-else
+                class="flex items-center gap-2"
+              >
+                <MinecraftObjectIcon
+                  :src="findAdvancementIconSrc(row.original.slug)"
+                  :alt="row.original.label"
+                  kind="item"
+                />
+                <div>
+                  <div>{{ row.original.label }}</div>
+                  <div
+                    v-if="row.original.description"
+                    class="text-xs text-muted"
+                  >
+                    {{ row.original.description }}
+                  </div>
+                </div>
+              </div>
+            </template>
+          </UTable>
+        </template>
       </UTabs>
 
       <div
+        v-if="activeTab !== 'advancements'"
         class="absolute right-0 top-1 flex h-8 items-center gap-3 text-sm"
       >
         <button
@@ -451,6 +573,18 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
         >
           Summe
         </button>
+      </div>
+
+      <div
+        v-if="activeTab === 'advancements'"
+        class="absolute right-0 top-1 flex h-8 items-center"
+      >
+        <USelect
+          v-model="selectedAdvancementCategory"
+          :items="advancementCategoryFilterItems"
+          size="sm"
+          class="w-36"
+        />
       </div>
     </div>
   </UContainer>

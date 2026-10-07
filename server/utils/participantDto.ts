@@ -27,10 +27,25 @@ export function toParticipantStatisticRowDto(score: ParticipantStatisticScore): 
   }
 }
 
-export function toParticipantDetailDto(scoredParticipant: ScoredParticipant): ParticipantDetailDto {
+export function toParticipantAdvancementRowDto(scoredAdvancement: ScoredAdvancement, participantId: string): ParticipantAdvancementRowDto {
+  const completedAt = scoredAdvancement.completedAtByParticipantId[participantId] ?? null
+
+  return {
+    slug: scoredAdvancement.definition.slug,
+    label: scoredAdvancement.definition.label,
+    description: scoredAdvancement.definition.description,
+    groupLabel: scoredAdvancement.definition.groupLabel,
+    points: scoredAdvancement.points,
+    completedAt,
+    completedAtDisplay: formatAdvancementCompletedAt(completedAt)
+  }
+}
+
+export function toParticipantDetailDto(scoredParticipant: ScoredParticipant, advancements: ParticipantAdvancementRowDto[]): ParticipantDetailDto {
   return {
     ...toParticipantListItemDto(scoredParticipant),
     twitchStreamTitle: scoredParticipant.twitchStreamTitle,
-    statistics: scoredParticipant.statistics.map(toParticipantStatisticRowDto)
+    statistics: scoredParticipant.statistics.map(toParticipantStatisticRowDto),
+    advancements
   }
 }
