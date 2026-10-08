@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
+const props = defineProps<{
+  activeTab: 'allgemein' | 'items' | 'entities' | 'advancements'
+}>()
+
 interface ResolvedStatistic {
   slug: string
   key: string
@@ -180,7 +184,10 @@ const statisticTabItems = [
   { label: 'Advancements', value: 'advancements', slot: 'advancements' as const }
 ]
 
-const activeStatisticTab = ref('allgemein')
+const activeStatisticTab = computed({
+  get: () => props.activeTab,
+  set: (newTab: string) => navigateTo(newTab === 'allgemein' ? `/teilnehmer/${participantId}` : `/teilnehmer/${participantId}/${newTab}`)
+})
 
 function openStatisticDetail(_event: Event, row: { original: ResolvedStatistic }) {
   navigateTo(`/statistiken/${row.original.slug}`)
