@@ -282,7 +282,8 @@ function buildPivotedParticipantRows(statisticsToPivot: ResolvedStatistic[]): Pi
     row.totalPoints = Object.values(row.cellsByActionCategory).reduce((sum, cell) => sum + (cell?.points ?? 0), 0)
   }
 
-  return [...rowsByObjectKey.values()]
+  // hide objects this participant has no recorded statistic for at all, rather than showing an all-dashes row
+  return [...rowsByObjectKey.values()].filter(row => row.totalValue > 0)
 }
 
 function buildActionColumns(
