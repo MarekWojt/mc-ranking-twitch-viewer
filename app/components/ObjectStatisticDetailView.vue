@@ -15,6 +15,7 @@ interface ResolvedObjectStatisticParticipantRow {
   totalValue: number
   pointsByCategory: Record<string, number>
   totalPoints: number
+  rankByCategory: Record<string, number>
 }
 
 interface ResolvedObjectStatisticDetail {
@@ -89,6 +90,7 @@ const tableColumns = computed<TableColumn<ResolvedObjectStatisticParticipantRow>
     { accessorKey: 'displayName', header: 'Spieler', enableSorting: false },
     ...categories.map((category): TableColumn<ResolvedObjectStatisticParticipantRow> => ({
       id: category,
+      meta: { class: RIGHT_ALIGNED_META_CLASS },
       accessorFn: (row: ResolvedObjectStatisticParticipantRow) =>
         displayMode === 'value' ? (row.valueByCategory[category] ?? 0) : (row.pointsByCategory[category] ?? 0),
       header: ({ column }: { column: SortableColumn }) =>
@@ -99,17 +101,19 @@ const tableColumns = computed<TableColumn<ResolvedObjectStatisticParticipantRow>
         if (displayMode === 'points') {
           const points = Math.round(row.original.pointsByCategory[category] ?? 0)
           if (!isTotalsRow && points === 0) return '–'
-          return isTotalsRow ? renderBoldTabularNumber(points) : h('span', { class: 'text-sm tabular-nums' }, points.toLocaleString('de-DE'))
+          if (isTotalsRow) return renderBoldTabularNumber(points)
+          return renderRankedValue(points.toLocaleString('de-DE'), row.original.rankByCategory[category]!)
         }
 
         const value = row.original.valueByCategory[category] ?? 0
         if (isTotalsRow) return renderBoldTabularNumber(value)
         if (value === 0) return '–'
-        return h('span', { class: 'text-sm tabular-nums' }, row.original.displayValueByCategory[category] ?? value.toLocaleString('de-DE'))
+        return renderRankedValue(row.original.displayValueByCategory[category] ?? value.toLocaleString('de-DE'), row.original.rankByCategory[category]!)
       }
     })),
     {
       id: 'total',
+      meta: { class: RIGHT_ALIGNED_META_CLASS },
       accessorFn: (row: ResolvedObjectStatisticParticipantRow) => displayMode === 'value' ? row.totalValue : row.totalPoints,
       header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, 'Gesamt'),
       cell: ({ row }) => renderBoldTabularNumber(displayMode === 'value' ? row.original.totalValue : Math.round(row.original.totalPoints))
@@ -139,7 +143,8 @@ const participantRows = computed<ResolvedObjectStatisticParticipantRow[]>(() => 
     displayValueByCategory: {},
     totalValue: Object.values(valueByCategory).reduce((sum, value) => sum + value, 0),
     pointsByCategory,
-    totalPoints: Object.values(pointsByCategory).reduce((sum, points) => sum + points, 0)
+    totalPoints: Object.values(pointsByCategory).reduce((sum, points) => sum + points, 0),
+    rankByCategory: {}
   }
 
   return [totalsRow, ...detail.value.participants]

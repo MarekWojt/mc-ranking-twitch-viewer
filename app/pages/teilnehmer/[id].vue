@@ -12,6 +12,7 @@ interface ResolvedStatistic {
   value: number
   displayValue: string
   points: number
+  rank: number
   searchText: string
 }
 
@@ -31,6 +32,7 @@ interface PivotedParticipantActionCell {
   value: number
   displayValue: string
   points: number
+  rank: number
 }
 
 interface GeneralStatisticThemeGroup {
@@ -243,11 +245,17 @@ function openEntityDetail(_event: Event, row: { original: PivotedParticipantRow 
 }
 
 const generalStatisticTableColumns = computed<TableColumn<ResolvedStatistic>[]>(() => [
-  { accessorKey: 'label', header: 'Statistik', meta: { class: { th: 'w-1/2', td: 'w-1/2' } } },
+  { accessorKey: 'label', header: 'Statistik' },
+  {
+    accessorKey: 'rank',
+    header: 'Platz',
+    meta: { class: { th: 'w-px whitespace-nowrap', td: 'w-px whitespace-nowrap' } },
+    cell: ({ row }) => h('span', { class: 'text-xs text-muted tabular-nums' }, `#${row.original.rank}`)
+  },
   {
     id: 'value',
     header: statDisplayMode.value === 'value' ? 'Wert' : 'Punkte',
-    meta: { class: { th: 'w-1/2', td: 'w-1/2' } },
+    meta: { class: { th: 'w-px whitespace-nowrap text-right', td: 'w-px whitespace-nowrap text-right' } },
     cell: ({ row }) => statDisplayMode.value === 'value' ? row.original.displayValue : Math.round(row.original.points)
   }
 ])
@@ -263,7 +271,8 @@ function buildPivotedParticipantRows(statisticsToPivot: ResolvedStatistic[]): Pi
     row.cellsByActionCategory[statistic.category] = {
       value: statistic.value,
       displayValue: statistic.displayValue,
-      points: statistic.points
+      points: statistic.points,
+      rank: statistic.rank
     }
     rowsByObjectKey.set(statistic.key, row)
   }
@@ -299,6 +308,7 @@ function buildActionColumns(
 
     return {
       id: category,
+      meta: { class: RIGHT_ALIGNED_META_CLASS },
       accessorFn: (row: PivotedParticipantRow) => {
         const cell = row.cellsByActionCategory[category]
         if (!cell) return 0
@@ -313,12 +323,13 @@ function buildActionColumns(
         if (displayMode === 'points') {
           const points = Math.round(cell.points)
           if (!isTotalsRow && points === 0) return '–'
-          return isTotalsRow ? renderBoldTabularNumber(points) : h('span', { class: 'text-sm tabular-nums' }, points.toLocaleString('de-DE'))
+          if (isTotalsRow) return renderBoldTabularNumber(points)
+          return renderRankedValue(points.toLocaleString('de-DE'), cell.rank)
         }
 
         if (isTotalsRow) return renderBoldTabularNumber(cell.value)
         if (cell.value === 0) return '–'
-        return h('span', { class: 'text-sm tabular-nums' }, cell.displayValue)
+        return renderRankedValue(cell.displayValue, cell.rank)
       }
     }
   })
@@ -329,6 +340,7 @@ function buildTotalColumn(): TableColumn<PivotedParticipantRow> {
 
   return {
     id: 'total',
+    meta: { class: RIGHT_ALIGNED_META_CLASS },
     accessorFn: (row: PivotedParticipantRow) => displayMode === 'value' ? row.totalValue : row.totalPoints,
     header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, 'Gesamt'),
     cell: ({ row }) => renderBoldTabularNumber(displayMode === 'value' ? row.original.totalValue : Math.round(row.original.totalPoints))
@@ -358,7 +370,7 @@ function buildTotalsRow(statisticsToPivot: ResolvedStatistic[]): PivotedParticip
       Object.keys(valueSumByCategory).map((category) => {
         const value = valueSumByCategory[category]!
         const points = pointsSumByCategory[category]!
-        return [category, { value, displayValue: value.toLocaleString('de-DE'), points }]
+        return [category, { value, displayValue: value.toLocaleString('de-DE'), points, rank: 0 }]
       })
     ),
     totalValue: Object.values(valueSumByCategory).reduce((sum, value) => sum + value, 0),

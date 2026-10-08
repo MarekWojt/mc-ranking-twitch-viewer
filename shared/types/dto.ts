@@ -22,6 +22,7 @@ export interface ParticipantStatisticRowDto {
   value: number
   displayValue: string
   points: number
+  rank: number
 }
 
 export interface ParticipantAdvancementRowDto {
@@ -69,6 +70,7 @@ export interface StatisticParticipantRowDto {
   value: number
   displayValue: string
   points: number
+  rank: number
 }
 
 export interface StatisticDetailDto {
@@ -97,6 +99,7 @@ export interface ObjectStatisticParticipantRowDto {
   totalValue: number
   pointsByCategory: Record<string, number>
   totalPoints: number
+  rankByCategory: Record<string, number>
 }
 
 export interface ObjectStatisticDetailDto {

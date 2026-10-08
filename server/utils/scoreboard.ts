@@ -2,6 +2,7 @@ export interface ParticipantStatisticScore {
   statistic: StatisticDefinition
   value: number
   points: number
+  rank: number
 }
 
 export interface ScoredParticipant {
@@ -86,11 +87,19 @@ export async function computeScoreboard(): Promise<Scoreboard> {
 
     const medianValue = calculateMedian([...valueByParticipantId.values()].filter(value => value >= 1))
 
+    const rankByParticipantId = new Map(
+      rankByCompetitionRanking(
+        participants.map(participant => ({ participantId: participant.id, value: valueByParticipantId.get(participant.id) ?? 0 })),
+        entry => entry.value
+      ).map(entry => [entry.participantId, entry.rank])
+    )
+
     for (const participant of participants) {
       const value = valueByParticipantId.get(participant.id) ?? 0
       const points = calculateStatisticPoints(value, medianValue)
+      const rank = rankByParticipantId.get(participant.id)!
 
-      statisticScoresByParticipantId.get(participant.id)?.push({ statistic: statisticDefinition, value, points })
+      statisticScoresByParticipantId.get(participant.id)?.push({ statistic: statisticDefinition, value, points, rank })
       totalScoreByParticipantId.set(participant.id, (totalScoreByParticipantId.get(participant.id) ?? 0) + points)
     }
   }

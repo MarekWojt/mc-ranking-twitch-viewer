@@ -20,6 +20,7 @@ export async function buildObjectStatisticDetail(
     const valueByCategory: Record<string, number> = {}
     const displayValueByCategory: Record<string, string> = {}
     const pointsByCategory: Record<string, number> = {}
+    const rankByCategory: Record<string, number> = {}
     let totalValue = 0
     let totalPoints = 0
 
@@ -31,6 +32,7 @@ export async function buildObjectStatisticDetail(
       totalValue += value
       pointsByCategory[definition.category] = score?.points ?? 0
       totalPoints += score?.points ?? 0
+      rankByCategory[definition.category] = score?.rank ?? scoreboard.participants.length
     }
 
     return {
@@ -41,7 +43,8 @@ export async function buildObjectStatisticDetail(
       displayValueByCategory,
       totalValue,
       pointsByCategory,
-      totalPoints
+      totalPoints,
+      rankByCategory
     }
   })
 

@@ -24,7 +24,8 @@ export function toParticipantStatisticRowDto(score: ParticipantStatisticScore): 
     specificSubgroup: score.statistic.specificSubgroup,
     value: score.value,
     displayValue: formatStatisticDisplayValue(score.statistic.key, score.value),
-    points: score.points
+    points: score.points,
+    rank: score.rank
   }
 }
 

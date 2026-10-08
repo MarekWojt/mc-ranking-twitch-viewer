@@ -288,7 +288,7 @@ function openEntityDetail(_event: Event, row: { original: PivotedStatisticRow })
   navigateTo(`/statistiken/entities/${stripMinecraftNamespace(row.original.objectKey)}`)
 }
 
-function renderStatisticLeaderCell(slug: string | null, leaders: StatisticLeaderDto[], displayValue: string) {
+function renderStatisticLeaderCell(slug: string | null, leaders: StatisticLeaderDto[], displayValue: string, align: 'start' | 'end' = 'end') {
   if (leaders.length === 0) return '–'
 
   const allLeaderNames = leaders.map(leader => leader.displayName).join(', ')
@@ -299,27 +299,27 @@ function renderStatisticLeaderCell(slug: string | null, leaders: StatisticLeader
     navigateTo(`/statistiken/${slug}`)
   }
 
+  const valueSpan = h('span', { class: 'text-sm tabular-nums' }, displayValue)
+  const avatarGroup = h('div', { class: 'flex shrink-0 flex-wrap gap-1 max-w-20' }, leaders.map(leader =>
+    h('img', {
+      key: leader.minecraftUuid,
+      src: buildMinecraftAvatarRenderUrl(leader.minecraftUuid, 'avatar'),
+      alt: leader.displayName,
+      title: leader.displayName,
+      class: 'size-6 rounded',
+      loading: 'lazy',
+      onError: (event: Event) => {
+        (event.target as HTMLImageElement).style.display = 'none'
+      }
+    })
+  ))
+
   return h(isClickable ? 'button' : 'span', {
     type: isClickable ? 'button' : undefined,
-    class: `flex shrink-0 items-center gap-1.5${isClickable ? ' hover:opacity-80' : ''}`,
+    class: `flex w-full items-center gap-1.5 ${align === 'end' ? 'justify-end' : 'justify-start'}${isClickable ? ' hover:opacity-80' : ''}`,
     title: allLeaderNames,
     onClick: isClickable ? handleClick : undefined
-  }, [
-    h('div', { class: 'flex shrink-0 flex-wrap gap-1 max-w-20' }, leaders.map(leader =>
-      h('img', {
-        key: leader.minecraftUuid,
-        src: buildMinecraftAvatarRenderUrl(leader.minecraftUuid, 'avatar'),
-        alt: leader.displayName,
-        title: leader.displayName,
-        class: 'size-6 rounded',
-        loading: 'lazy',
-        onError: (event: Event) => {
-          (event.target as HTMLImageElement).style.display = 'none'
-        }
-      })
-    )),
-    h('span', { class: 'text-sm tabular-nums' }, displayValue)
-  ])
+  }, align === 'end' ? [valueSpan, avatarGroup] : [avatarGroup, valueSpan])
 }
 
 const generalStatisticTableColumns = computed<TableColumn<ResolvedStatistic>[]>(() => [
@@ -327,7 +327,7 @@ const generalStatisticTableColumns = computed<TableColumn<ResolvedStatistic>[]>(
   {
     id: 'leader',
     header: pivotValueMode.value === 'max' ? '1. Platz' : 'Summe',
-    meta: { class: { th: 'w-1/2', td: 'w-1/2' } },
+    meta: { class: { th: `w-1/2 ${RIGHT_ALIGNED_META_CLASS.th}`, td: `w-1/2 ${RIGHT_ALIGNED_META_CLASS.td}` } },
     cell: ({ row }) => pivotValueMode.value === 'max'
       ? renderStatisticLeaderCell(row.original.slug, row.original.leaders, row.original.maxDisplayValue)
       : h('span', { class: 'text-sm tabular-nums' }, row.original.totalDisplayValue)
@@ -390,7 +390,7 @@ function buildActionColumns(
         if (!cell) return 0
         return valueMode === 'max' ? cell.maxValue : cell.totalValue
       },
-      header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, headerContent),
+      header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, headerContent, 'start'),
       cell: ({ row }: { row: { original: PivotedStatisticRow } }) => {
         const cell = row.original.cellsByActionCategory[category]
         if (!cell) return '–'
@@ -400,7 +400,7 @@ function buildActionColumns(
             : h('span', { class: 'text-sm tabular-nums' }, cell.totalDisplayValue)
         }
         if (row.original.objectKey === TOTALS_ROW_OBJECT_KEY) return renderBoldTabularNumber(cell.maxValue)
-        return renderStatisticLeaderCell(null, cell.leaders, cell.maxDisplayValue)
+        return renderStatisticLeaderCell(null, cell.leaders, cell.maxDisplayValue, 'start')
       }
     }
   })
@@ -411,6 +411,7 @@ function buildTotalValueAcrossActionsColumn(): TableColumn<PivotedStatisticRow> 
 
   return {
     id: 'valueAcrossActions',
+    meta: { class: RIGHT_ALIGNED_META_CLASS },
     accessorFn: (row: PivotedStatisticRow) => valueMode === 'max' ? row.maxValueAcrossActions : row.totalValueAcrossActions,
     header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, 'Gesamt'),
     cell: ({ row }: { row: { original: PivotedStatisticRow } }) =>

@@ -25,13 +25,26 @@ const statistic = computed(() => {
 })
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
+const TOTALS_ROW_PARTICIPANT_ID = '__totals__'
+
 const statisticParticipantTableColumns: TableColumn<StatisticParticipantRowDto>[] = [
   { accessorKey: 'displayName', header: 'Teilnehmer' },
-  { accessorKey: 'displayValue', header: 'Wert' },
-  { accessorKey: 'points', header: 'Punkte' }
+  {
+    accessorKey: 'rank',
+    header: 'Platz',
+    meta: { class: { th: 'w-px whitespace-nowrap', td: 'w-px whitespace-nowrap' } },
+    cell: ({ row }) => row.original.participantId === TOTALS_ROW_PARTICIPANT_ID
+      ? null
+      : h('span', { class: 'text-xs text-muted tabular-nums' }, `#${row.original.rank}`)
+  },
+  { accessorKey: 'displayValue', header: 'Wert', meta: { class: { th: 'w-px whitespace-nowrap text-right', td: 'w-px whitespace-nowrap text-right' } } },
+  {
+    accessorKey: 'points',
+    header: 'Punkte',
+    meta: { class: { th: 'w-px whitespace-nowrap text-right', td: 'w-px whitespace-nowrap text-right' } },
+    cell: ({ row }) => Math.round(row.original.points)
+  }
 ]
-
-const TOTALS_ROW_PARTICIPANT_ID = '__totals__'
 
 const participantRows = computed<StatisticParticipantRowDto[]>(() => {
   if (!statistic.value) return []
@@ -42,7 +55,8 @@ const participantRows = computed<StatisticParticipantRowDto[]>(() => {
     minecraftUuid: '',
     value: statistic.value.totalValue,
     displayValue: statistic.value.totalDisplayValue,
-    points: statistic.value.totalPoints
+    points: statistic.value.totalPoints,
+    rank: 0
   }
 
   return [totalsRow, ...statistic.value.participants]
@@ -99,10 +113,6 @@ function openParticipantDetail(_event: Event, row: { original: StatisticParticip
           >
           <span class="font-medium">{{ row.original.displayName }}</span>
         </div>
-      </template>
-
-      <template #points-cell="{ row }">
-        {{ Math.round(row.original.points) }}
       </template>
     </UTable>
   </UContainer>

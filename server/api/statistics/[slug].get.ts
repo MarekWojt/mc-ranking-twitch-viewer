@@ -17,7 +17,8 @@ export default defineEventHandler(async (event): Promise<DataWithFreshness<Stati
         minecraftUuid: scoredParticipant.participant.minecraftUuid,
         value: score?.value ?? 0,
         displayValue: formatStatisticDisplayValue(statisticDefinition.key, score?.value ?? 0),
-        points: score?.points ?? 0
+        points: score?.points ?? 0,
+        rank: score?.rank ?? scoreboard.participants.length
       }
     })
     .sort((a, b) => b.points - a.points)
