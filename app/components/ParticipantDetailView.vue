@@ -106,6 +106,17 @@ const twitchChannelUrl = computed(() =>
   participant.value?.twitchLogin ? `https://twitch.tv/${participant.value.twitchLogin}` : null
 )
 
+const minecraftBodyRenderUrl = computed(() =>
+  participant.value ? buildMinecraftAvatarRenderUrl(participant.value.minecraftUuid, 'body') : null
+)
+const minecraftBodyRenderFailed = ref(false)
+
+const cardBackgroundClass = computed(() =>
+  participant.value ? buildStatusBackgroundClass(participant.value.isLiveOnTwitch, participant.value.isOnlineOnMinecraftServer) : undefined
+)
+
+const formattedTotalScore = computed(() => participant.value ? Math.round(participant.value.totalScore).toLocaleString('de-DE') : '')
+
 type StatDisplayMode = 'value' | 'points'
 
 const statDisplayMode = ref<StatDisplayMode>('value')
@@ -420,33 +431,147 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
     v-if="participant"
     class="py-10 space-y-8"
   >
-    <div class="flex flex-wrap items-stretch gap-6">
-      <div class="w-64">
-        <ParticipantCard :participant="participant" />
-      </div>
+    <div class="flex items-center justify-end">
+      <DataFreshnessNote :as-of="dataAsOf" />
+    </div>
 
-      <div class="flex flex-1 flex-col items-end justify-between">
-        <UButton
+    <component
+      :is="twitchChannelUrl ? 'a' : 'div'"
+      :href="twitchChannelUrl ?? undefined"
+      :target="twitchChannelUrl ? '_blank' : undefined"
+      :rel="twitchChannelUrl ? 'noopener noreferrer' : undefined"
+      class="group block"
+    >
+      <UCard
+        class="relative overflow-hidden transition-colors"
+        :class="[cardBackgroundClass, twitchChannelUrl ? 'group-hover:border-primary/50' : '']"
+        :ui="{ body: 'p-0 sm:p-0' }"
+      >
+        <div
           v-if="twitchChannelUrl"
-          :to="twitchChannelUrl"
-          target="_blank"
-          trailing-icon="i-lucide-arrow-up-right"
-          size="sm"
-          :color="participant.isLiveOnTwitch ? 'error' : 'neutral'"
-          :variant="participant.isLiveOnTwitch ? 'solid' : 'subtle'"
+          class="absolute top-4 right-4 z-10 flex items-center gap-1 text-muted transition-colors group-hover:text-primary"
         >
-          {{ participant.isLiveOnTwitch ? 'Live auf Twitch' : 'zu Twitch' }}
-        </UButton>
-        <div class="flex flex-col items-end gap-2">
-          <DataFreshnessNote :as-of="dataAsOf" />
-          <UInput
-            v-model="statisticsSearchQuery"
-            icon="i-lucide-search"
-            placeholder="Statistik suchen…"
+          <span class="text-xs font-medium">Zu Twitch</span>
+          <UIcon
+            name="i-lucide-arrow-up-right"
+            class="size-5"
           />
         </div>
-      </div>
-    </div>
+
+        <div class="flex flex-col sm:flex-row">
+          <div class="relative flex shrink-0 items-end justify-center sm:w-56">
+            <img
+              v-if="minecraftBodyRenderUrl && !minecraftBodyRenderFailed"
+              :src="minecraftBodyRenderUrl"
+              :alt="`Minecraft-Skin von ${participant.displayName}`"
+              class="h-56 w-auto select-none pt-6"
+              loading="lazy"
+              @error="minecraftBodyRenderFailed = true"
+            >
+            <UIcon
+              v-else
+              name="i-lucide-user-round"
+              class="mb-6 size-28 text-muted"
+            />
+          </div>
+
+          <div class="@container flex min-w-0 flex-1 flex-col justify-center gap-5 p-6">
+            <div class="flex items-center gap-4">
+              <div
+                v-if="twitchChannelUrl"
+                class="flex size-24 shrink-0 items-center justify-center"
+              >
+                <img
+                  v-if="participant.twitchProfileImageUrl"
+                  :src="participant.twitchProfileImageUrl"
+                  :alt="`Twitch-Profilbild von ${participant.displayName}`"
+                  class="size-24 rounded-full border-2 border-default"
+                >
+                <UIcon
+                  v-else
+                  name="i-simple-icons-twitch"
+                  class="size-16 text-muted"
+                />
+              </div>
+
+              <div class="min-w-0">
+                <h1 class="truncate text-3xl font-bold tracking-tight">
+                  {{ participant.displayName }}
+                </h1>
+                <p
+                  v-if="twitchChannelUrl && participant.isLiveOnTwitch"
+                  class="mt-1 text-base font-medium text-default"
+                >
+                  {{ participant.twitchStreamTitle }}
+                </p>
+                <p
+                  v-if="twitchChannelUrl && participant.isLiveOnTwitch"
+                  class="mt-1.5 flex items-center gap-1.5 text-sm font-semibold text-error"
+                >
+                  <span class="size-2 animate-pulse rounded-full bg-error" />
+                  <span>Live auf Twitch</span>
+                  <template v-if="participant.twitchStreamGame">
+                    <span class="text-muted">·</span>
+                    <span class="font-normal text-muted">{{ participant.twitchStreamGame }}</span>
+                  </template>
+                </p>
+                <p
+                  v-else-if="twitchChannelUrl"
+                  class="mt-1 text-sm font-semibold text-muted"
+                >
+                  Offline
+                </p>
+              </div>
+            </div>
+
+            <div class="flex gap-4">
+              <div
+                v-if="twitchChannelUrl && participant.isLiveOnTwitch"
+                class="hidden w-24 shrink-0 @lg:block"
+              />
+
+              <div class="flex flex-wrap gap-x-10 gap-y-3">
+                <div>
+                  <p class="text-2xl font-bold tabular-nums">
+                    #{{ participant.rank }}
+                  </p>
+                  <p class="text-xs font-medium tracking-wide text-muted uppercase">
+                    Platz
+                  </p>
+                </div>
+                <div>
+                  <p class="text-2xl font-bold tabular-nums">
+                    {{ formattedTotalScore }}
+                  </p>
+                  <p class="text-xs font-medium tracking-wide text-muted uppercase">
+                    Punkte
+                  </p>
+                </div>
+                <div>
+                  <p
+                    class="text-2xl font-bold"
+                    :class="participant.isOnlineOnMinecraftServer ? 'text-success' : 'text-muted'"
+                  >
+                    {{ participant.isOnlineOnMinecraftServer ? 'Online' : 'Offline' }}
+                  </p>
+                  <p class="text-xs font-medium tracking-wide text-muted uppercase">
+                    Server
+                  </p>
+                </div>
+                <div>
+                  <p class="text-2xl font-bold tabular-nums">
+                    {{ participant.percentOfLeaderScore.toFixed(1) }}%
+                  </p>
+                  <p class="text-xs font-medium tracking-wide text-muted uppercase">
+                    Von Platz 1
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </UCard>
+    </component>
 
     <div class="relative">
       <UTabs
@@ -562,33 +687,38 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
         </template>
       </UTabs>
 
-      <div
-        v-if="activeStatisticTab !== 'advancements'"
-        class="absolute right-0 top-1 flex h-8 items-center gap-3 text-sm"
-      >
-        <button
-          type="button"
-          class="font-medium transition-colors"
-          :class="statDisplayMode === 'value' ? 'text-primary' : 'text-muted hover:text-default'"
-          @click="statDisplayMode = 'value'"
-        >
-          Wert
-        </button>
-        <button
-          type="button"
-          class="font-medium transition-colors"
-          :class="statDisplayMode === 'points' ? 'text-primary' : 'text-muted hover:text-default'"
-          @click="statDisplayMode = 'points'"
-        >
-          Punkte
-        </button>
-      </div>
+      <div class="absolute right-0 top-1 flex h-8 items-center gap-3">
+        <UInput
+          v-model="statisticsSearchQuery"
+          icon="i-lucide-search"
+          placeholder="Statistik suchen…"
+          size="sm"
+        />
 
-      <div
-        v-if="activeStatisticTab === 'advancements'"
-        class="absolute right-0 top-1 flex h-8 items-center"
-      >
+        <div
+          v-if="activeStatisticTab !== 'advancements'"
+          class="flex items-center gap-3 text-sm"
+        >
+          <button
+            type="button"
+            class="font-medium transition-colors"
+            :class="statDisplayMode === 'value' ? 'text-primary' : 'text-muted hover:text-default'"
+            @click="statDisplayMode = 'value'"
+          >
+            Wert
+          </button>
+          <button
+            type="button"
+            class="font-medium transition-colors"
+            :class="statDisplayMode === 'points' ? 'text-primary' : 'text-muted hover:text-default'"
+            @click="statDisplayMode = 'points'"
+          >
+            Punkte
+          </button>
+        </div>
+
         <USelect
+          v-if="activeStatisticTab === 'advancements'"
           v-model="selectedAdvancementCategory"
           :items="advancementCategoryFilterItems"
           size="sm"

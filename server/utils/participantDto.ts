@@ -48,6 +48,7 @@ export function toParticipantDetailDto(scoredParticipant: ScoredParticipant, adv
   return {
     ...toParticipantListItemDto(scoredParticipant),
     twitchStreamTitle: scoredParticipant.twitchStreamTitle,
+    twitchStreamGame: scoredParticipant.twitchStreamGame,
     statistics: scoredParticipant.statistics.map(toParticipantStatisticRowDto),
     advancements
   }

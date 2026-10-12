@@ -38,6 +38,7 @@ export interface ParticipantAdvancementRowDto {
 
 export interface ParticipantDetailDto extends ParticipantListItemDto {
   twitchStreamTitle: string | null
+  twitchStreamGame: string | null
   statistics: ParticipantStatisticRowDto[]
   advancements: ParticipantAdvancementRowDto[]
 }

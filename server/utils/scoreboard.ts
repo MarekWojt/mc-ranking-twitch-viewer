@@ -13,6 +13,7 @@ export interface ScoredParticipant {
   isOnlineOnMinecraftServer: boolean
   isLiveOnTwitch: boolean
   twitchStreamTitle: string | null
+  twitchStreamGame: string | null
   twitchProfileImageUrl: string | null
   statistics: ParticipantStatisticScore[]
 }
@@ -128,6 +129,7 @@ export async function computeScoreboard(): Promise<Scoreboard> {
         isOnlineOnMinecraftServer: onlinePlayerUuidSet.has(participant.minecraftUuid),
         isLiveOnTwitch: liveStream !== undefined,
         twitchStreamTitle: liveStream?.title ?? null,
+        twitchStreamGame: liveStream?.gameName ?? null,
         twitchProfileImageUrl: participant.twitchLogin !== null ? profileImageUrlByTwitchLogin[participant.twitchLogin] ?? null : null,
         statistics: (statisticScoresByParticipantId.get(participant.id) ?? []).sort((a, b) => b.points - a.points)
       }
