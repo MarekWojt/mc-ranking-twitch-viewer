@@ -97,7 +97,7 @@ function openParticipantDetail(_event: Event, row: { original: ParticipantListIt
       </template>
 
       <template #totalScore-cell="{ row }">
-        {{ Math.round(row.original.totalScore) }}
+        {{ formatRoundedPoints(row.original.totalScore) }}
       </template>
 
       <template #percentOfLeaderScore-cell="{ row }">

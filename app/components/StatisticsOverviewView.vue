@@ -18,6 +18,7 @@ interface ResolvedStatistic {
   totalValue: number
   totalDisplayValue: string
   leaders: StatisticLeaderDto[]
+  weight: number
   searchText: string
 }
 
@@ -323,7 +324,12 @@ function renderStatisticLeaderCell(slug: string | null, leaders: StatisticLeader
 }
 
 const generalStatisticTableColumns = computed<TableColumn<ResolvedStatistic>[]>(() => [
-  { accessorKey: 'label', header: 'Statistik', meta: { class: { th: 'w-1/2', td: 'w-1/2' } } },
+  {
+    accessorKey: 'label',
+    header: 'Statistik',
+    meta: { class: { th: 'w-1/2', td: 'w-1/2' } },
+    cell: ({ row }) => renderStatisticLabelWithWeight(row.original.label, row.original.weight)
+  },
   {
     id: 'leader',
     header: pivotValueMode.value === 'max' ? '1. Platz' : 'Summe',

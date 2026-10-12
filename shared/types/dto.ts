@@ -22,7 +22,9 @@ export interface ParticipantStatisticRowDto {
   value: number
   displayValue: string
   points: number
+  unweightedPoints: number
   rank: number
+  weight: number
 }
 
 export interface ParticipantAdvancementRowDto {
@@ -62,6 +64,7 @@ export interface StatisticListItemDto {
   totalValue: number
   totalDisplayValue: string
   leaders: StatisticLeaderDto[]
+  weight: number
 }
 
 export interface StatisticParticipantRowDto {
@@ -71,6 +74,7 @@ export interface StatisticParticipantRowDto {
   value: number
   displayValue: string
   points: number
+  unweightedPoints: number
   rank: number
 }
 
@@ -82,7 +86,9 @@ export interface StatisticDetailDto {
   totalValue: number
   totalDisplayValue: string
   totalPoints: number
+  totalUnweightedPoints: number
   participants: StatisticParticipantRowDto[]
+  weight: number
 }
 
 export interface MinecraftIconBundleDto {

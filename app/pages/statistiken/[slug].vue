@@ -42,7 +42,7 @@ const statisticParticipantTableColumns: TableColumn<StatisticParticipantRowDto>[
     accessorKey: 'points',
     header: 'Punkte',
     meta: { class: { th: 'w-px whitespace-nowrap text-right', td: 'w-px whitespace-nowrap text-right' } },
-    cell: ({ row }) => Math.round(row.original.points)
+    cell: ({ row }) => renderWeightedPoints(row.original.points, row.original.unweightedPoints, statistic.value?.weight ?? DEFAULT_STATISTIC_WEIGHT)
   }
 ]
 
@@ -56,6 +56,7 @@ const participantRows = computed<StatisticParticipantRowDto[]>(() => {
     value: statistic.value.totalValue,
     displayValue: statistic.value.totalDisplayValue,
     points: statistic.value.totalPoints,
+    unweightedPoints: statistic.value.totalUnweightedPoints,
     rank: 0
   }
 
@@ -81,9 +82,19 @@ function openParticipantDetail(_event: Event, row: { original: StatisticParticip
     class="py-10 space-y-6"
   >
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h1 class="text-2xl font-semibold">
-        {{ statistic.label }}
-      </h1>
+      <div class="flex items-center gap-3">
+        <h1 class="text-2xl font-semibold">
+          {{ statistic.label }}
+        </h1>
+        <UBadge
+          v-if="statistic.weight !== DEFAULT_STATISTIC_WEIGHT"
+          :label="formatStatisticWeight(statistic.weight)"
+          :color="resolveStatisticWeightBadgeColor(statistic.weight)"
+          variant="subtle"
+          class="tabular-nums"
+          :title="describeStatisticWeight(statistic.weight)"
+        />
+      </div>
       <DataFreshnessNote :as-of="dataAsOf" />
     </div>
 

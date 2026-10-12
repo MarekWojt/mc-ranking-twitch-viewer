@@ -11,7 +11,7 @@ const cardBackgroundClass = computed(() =>
   buildStatusBackgroundClass(props.participant.isLiveOnTwitch, props.participant.isOnlineOnMinecraftServer)
 )
 
-const formattedTotalScore = computed(() => Math.round(props.participant.totalScore).toLocaleString('de-DE'))
+const formattedTotalScore = computed(() => formatRoundedPoints(props.participant.totalScore))
 
 const isTwitchButtonHovered = ref(false)
 </script>

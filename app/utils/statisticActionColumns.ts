@@ -1,4 +1,5 @@
 import type { VNodeChild } from 'vue'
+import { UBadge } from '#components'
 
 export const ITEM_ACTION_ICON_BY_CATEGORY: Record<string, string> = {
   broken: '💥',
@@ -40,9 +41,52 @@ export function renderActionColumnHeaderContent(actionLabel: string, icon: strin
 }
 
 export function renderBoldTabularNumber(value: number) {
-  return h('span', { class: 'text-sm tabular-nums font-medium' }, value.toLocaleString('de-DE'))
+  return h('span', { class: 'text-sm tabular-nums font-medium' }, formatNumberWithTypographicMinus(value))
 }
 
 export function renderRankedValue(text: string, rank: number) {
   return h('span', { class: 'text-sm tabular-nums', title: `Platz #${rank}` }, text)
+}
+
+export const DEFAULT_STATISTIC_WEIGHT = 1
+
+const NARROW_NO_BREAK_SPACE = '\u202F'
+
+export function formatStatisticWeight(weight: number): string {
+  return `×${NARROW_NO_BREAK_SPACE}${formatNumberWithTypographicMinus(weight)}`
+}
+
+export function describeStatisticWeight(weight: number): string {
+  return `Fließt mit Faktor ${formatNumberWithTypographicMinus(weight)} in die Gesamtpunktzahl ein`
+}
+
+export function renderWeightedPoints(points: number, unweightedPoints: number, weight: number): VNodeChild {
+  const formattedPoints = formatRoundedPoints(points)
+  if (weight !== 0) return formattedPoints
+
+  const formattedUnweightedPoints = formatRoundedPoints(unweightedPoints)
+  return h('span', {}, [
+    formattedPoints,
+    h('span', { class: 'ml-1 text-muted', title: `Ohne Faktor: ${formattedUnweightedPoints} Punkte` }, `(${formattedUnweightedPoints})`)
+  ])
+}
+
+export function resolveStatisticWeightBadgeColor(weight: number): 'error' | 'neutral' {
+  return weight < 0 ? 'error' : 'neutral'
+}
+
+export function renderStatisticLabelWithWeight(label: string, weight: number): VNodeChild {
+  if (weight === DEFAULT_STATISTIC_WEIGHT) return label
+
+  return h('span', { class: 'inline-flex items-center gap-2' }, [
+    label,
+    h(UBadge, {
+      label: formatStatisticWeight(weight),
+      color: resolveStatisticWeightBadgeColor(weight),
+      variant: 'subtle',
+      size: 'sm',
+      class: 'tabular-nums',
+      title: describeStatisticWeight(weight)
+    })
+  ])
 }

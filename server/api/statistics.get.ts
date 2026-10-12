@@ -46,7 +46,8 @@ export default defineEventHandler(async (): Promise<DataWithFreshness<StatisticL
         maxDisplayValue: formatStatisticDisplayValue(definition.key, maxValue),
         totalValue,
         totalDisplayValue: formatStatisticDisplayValue(definition.key, totalValue),
-        leaders
+        leaders,
+        weight: definition.weight
       }
     })
   }

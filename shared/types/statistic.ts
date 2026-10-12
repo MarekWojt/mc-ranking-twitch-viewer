@@ -9,4 +9,5 @@ export interface StatisticDefinition {
   groupLabel: LocalizedLabel | null
   specificSubgroup: SpecificStatisticSubgroup | null
   label: LocalizedLabel
+  weight: number
 }

@@ -16,7 +16,9 @@ interface ResolvedStatistic {
   value: number
   displayValue: string
   points: number
+  unweightedPoints: number
   rank: number
+  weight: number
   searchText: string
 }
 
@@ -115,7 +117,7 @@ const cardBackgroundClass = computed(() =>
   participant.value ? buildStatusBackgroundClass(participant.value.isLiveOnTwitch, participant.value.isOnlineOnMinecraftServer) : undefined
 )
 
-const formattedTotalScore = computed(() => participant.value ? Math.round(participant.value.totalScore).toLocaleString('de-DE') : '')
+const formattedTotalScore = computed(() => participant.value ? formatRoundedPoints(participant.value.totalScore) : '')
 
 type StatDisplayMode = 'value' | 'points'
 
@@ -169,7 +171,7 @@ const generalStatisticThemeGroups = computed<GeneralStatisticThemeGroup[]>(() =>
   }
 
   for (const themeStatistics of statisticsByTheme.values()) {
-    themeStatistics.sort((a, b) => statDisplayMode.value === 'value' ? b.value - a.value : b.points - a.points)
+    themeStatistics.sort((a, b) => statDisplayMode.value === 'value' ? b.value - a.value : b.unweightedPoints - a.unweightedPoints)
   }
 
   const orderedThemes = [
@@ -263,7 +265,11 @@ function openEntityDetail(_event: Event, row: { original: PivotedParticipantRow 
 }
 
 const generalStatisticTableColumns = computed<TableColumn<ResolvedStatistic>[]>(() => [
-  { accessorKey: 'label', header: 'Statistik' },
+  {
+    accessorKey: 'label',
+    header: 'Statistik',
+    cell: ({ row }) => renderStatisticLabelWithWeight(row.original.label, row.original.weight)
+  },
   {
     accessorKey: 'rank',
     header: 'Platz',
@@ -274,7 +280,9 @@ const generalStatisticTableColumns = computed<TableColumn<ResolvedStatistic>[]>(
     id: 'value',
     header: statDisplayMode.value === 'value' ? 'Wert' : 'Punkte',
     meta: { class: { th: 'w-px whitespace-nowrap text-right', td: 'w-px whitespace-nowrap text-right' } },
-    cell: ({ row }) => statDisplayMode.value === 'value' ? row.original.displayValue : Math.round(row.original.points)
+    cell: ({ row }) => statDisplayMode.value === 'value'
+      ? row.original.displayValue
+      : renderWeightedPoints(row.original.points, row.original.unweightedPoints, row.original.weight)
   }
 ])
 

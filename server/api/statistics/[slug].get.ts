@@ -18,13 +18,15 @@ export default defineEventHandler(async (event): Promise<DataWithFreshness<Stati
         value: score?.value ?? 0,
         displayValue: formatStatisticDisplayValue(statisticDefinition.key, score?.value ?? 0),
         points: score?.points ?? 0,
+        unweightedPoints: score?.unweightedPoints ?? 0,
         rank: score?.rank ?? scoreboard.participants.length
       }
     })
-    .sort((a, b) => b.points - a.points)
+    .sort((a, b) => b.unweightedPoints - a.unweightedPoints)
 
   const totalValue = participantRows.reduce((sum, row) => sum + row.value, 0)
   const totalPoints = participantRows.reduce((sum, row) => sum + row.points, 0)
+  const totalUnweightedPoints = participantRows.reduce((sum, row) => sum + row.unweightedPoints, 0)
 
   return {
     asOf: scoreboard.asOf,
@@ -36,7 +38,9 @@ export default defineEventHandler(async (event): Promise<DataWithFreshness<Stati
       totalValue,
       totalDisplayValue: formatStatisticDisplayValue(statisticDefinition.key, totalValue),
       totalPoints,
-      participants: participantRows
+      totalUnweightedPoints,
+      participants: participantRows,
+      weight: statisticDefinition.weight
     }
   }
 })

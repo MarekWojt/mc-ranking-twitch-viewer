@@ -25,7 +25,9 @@ export function toParticipantStatisticRowDto(score: ParticipantStatisticScore): 
     value: score.value,
     displayValue: formatStatisticDisplayValue(score.statistic.key, score.value),
     points: score.points,
-    rank: score.rank
+    unweightedPoints: score.unweightedPoints,
+    rank: score.rank,
+    weight: score.statistic.weight
   }
 }
 

@@ -2,6 +2,7 @@ export interface ParticipantStatisticScore {
   statistic: StatisticDefinition
   value: number
   points: number
+  unweightedPoints: number
   rank: number
 }
 
@@ -97,10 +98,11 @@ export async function computeScoreboard(): Promise<Scoreboard> {
 
     for (const participant of participants) {
       const value = valueByParticipantId.get(participant.id) ?? 0
-      const points = calculateStatisticPoints(value, medianValue)
+      const unweightedPoints = calculateStatisticPoints(value, medianValue)
+      const points = unweightedPoints * statisticDefinition.weight
       const rank = rankByParticipantId.get(participant.id)!
 
-      statisticScoresByParticipantId.get(participant.id)?.push({ statistic: statisticDefinition, value, points, rank })
+      statisticScoresByParticipantId.get(participant.id)?.push({ statistic: statisticDefinition, value, points, unweightedPoints, rank })
       totalScoreByParticipantId.set(participant.id, (totalScoreByParticipantId.get(participant.id) ?? 0) + points)
     }
   }
@@ -131,7 +133,7 @@ export async function computeScoreboard(): Promise<Scoreboard> {
         twitchStreamTitle: liveStream?.title ?? null,
         twitchStreamGame: liveStream?.gameName ?? null,
         twitchProfileImageUrl: participant.twitchLogin !== null ? profileImageUrlByTwitchLogin[participant.twitchLogin] ?? null : null,
-        statistics: (statisticScoresByParticipantId.get(participant.id) ?? []).sort((a, b) => b.points - a.points)
+        statistics: (statisticScoresByParticipantId.get(participant.id) ?? []).sort((a, b) => b.unweightedPoints - a.unweightedPoints)
       }
     })
   }

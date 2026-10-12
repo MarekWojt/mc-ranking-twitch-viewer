@@ -72,7 +72,8 @@ export function buildStatisticDefinition(category: string, key: string, vanillaD
     label: {
       en: officialLabelEn ?? humanizeMinecraftId(key),
       de: officialLabelDe ?? null
-    }
+    },
+    weight: resolveStatisticWeight(category, key)
   }
 }
 
