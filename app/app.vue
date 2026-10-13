@@ -43,6 +43,14 @@ const navigationItems = [
       <template #right>
         <AppSettingsMenu />
       </template>
+
+      <template #body>
+        <UNavigationMenu
+          :items="navigationItems"
+          orientation="vertical"
+          class="-mx-2.5"
+        />
+      </template>
     </UHeader>
 
     <UMain>
