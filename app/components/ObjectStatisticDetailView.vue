@@ -14,6 +14,7 @@ interface ResolvedObjectStatisticParticipantRow {
   displayValueByCategory: Record<string, string>
   totalValue: number
   pointsByCategory: Record<string, number>
+  pointsWithoutStatisticWeightByCategory: Record<string, number>
   totalPoints: number
   rankByCategory: Record<string, number>
 }
@@ -26,7 +27,7 @@ interface ResolvedObjectStatisticDetail {
   participants: ResolvedObjectStatisticParticipantRow[]
 }
 
-const { data: response, refresh } = await useFetch<DataWithFreshness<ObjectStatisticDetailDto>>(
+const { data: response, refresh } = await useFetch<ScoredDataWithFreshness<ObjectStatisticDetailDto>>(
   () => `/api/statistics/${props.kind}/${props.bareKey}`
 )
 
@@ -58,6 +59,8 @@ const detail = computed<ResolvedObjectStatisticDetail | null>(() => {
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
 const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+
+const scoreGroupFactors = computed(() => response.value?.scoreGroupFactors ?? null)
 
 const iconSrc = computed(() => props.kind === 'items'
   ? iconBundle.value?.itemIconsByBareId[props.bareKey] ?? null
@@ -92,7 +95,7 @@ const tableColumns = computed<TableColumn<ResolvedObjectStatisticParticipantRow>
       id: category,
       meta: { class: RIGHT_ALIGNED_META_CLASS },
       accessorFn: (row: ResolvedObjectStatisticParticipantRow) =>
-        displayMode === 'value' ? (row.valueByCategory[category] ?? 0) : (row.pointsByCategory[category] ?? 0),
+        displayMode === 'value' ? (row.valueByCategory[category] ?? 0) : (row.pointsWithoutStatisticWeightByCategory[category] ?? 0),
       header: ({ column }: { column: SortableColumn }) =>
         renderSortableColumnHeader(column, renderActionColumnHeaderContent(labelByCategory[category]!, resolveActionIcon(category))),
       cell: ({ row }: { row: { original: ResolvedObjectStatisticParticipantRow } }) => {
@@ -102,7 +105,7 @@ const tableColumns = computed<TableColumn<ResolvedObjectStatisticParticipantRow>
           const points = Math.round(row.original.pointsByCategory[category] ?? 0)
           if (!isTotalsRow && points === 0) return '–'
           if (isTotalsRow) return renderBoldTabularNumber(points)
-          return renderRankedValue(points.toLocaleString('de-DE'), row.original.rankByCategory[category]!)
+          return renderRankedValue(formatNumberWithTypographicMinus(points), row.original.rankByCategory[category]!)
         }
 
         const value = row.original.valueByCategory[category] ?? 0
@@ -130,9 +133,11 @@ const participantRows = computed<ResolvedObjectStatisticParticipantRow[]>(() => 
 
   const valueByCategory: Record<string, number> = {}
   const pointsByCategory: Record<string, number> = {}
+  const pointsWithoutStatisticWeightByCategory: Record<string, number> = {}
   for (const category of detail.value.categories) {
     valueByCategory[category] = detail.value.participants.reduce((sum, participant) => sum + (participant.valueByCategory[category] ?? 0), 0)
     pointsByCategory[category] = detail.value.participants.reduce((sum, participant) => sum + (participant.pointsByCategory[category] ?? 0), 0)
+    pointsWithoutStatisticWeightByCategory[category] = detail.value.participants.reduce((sum, participant) => sum + (participant.pointsWithoutStatisticWeightByCategory[category] ?? 0), 0)
   }
 
   const totalsRow: ResolvedObjectStatisticParticipantRow = {
@@ -143,6 +148,7 @@ const participantRows = computed<ResolvedObjectStatisticParticipantRow[]>(() => 
     displayValueByCategory: {},
     totalValue: Object.values(valueByCategory).reduce((sum, value) => sum + value, 0),
     pointsByCategory,
+    pointsWithoutStatisticWeightByCategory,
     totalPoints: Object.values(pointsByCategory).reduce((sum, points) => sum + points, 0),
     rankByCategory: {}
   }
@@ -205,12 +211,20 @@ function openParticipantDetail(_event: Event, row: { original: ResolvedObjectSta
     <UTable
       :data="participantRows"
       :columns="tableColumns"
+      :ui="{ separator: 'hidden', th: 'pb-0 align-bottom' }"
       :meta="participantTableRowMeta"
       :get-row-id="(row: ResolvedObjectStatisticParticipantRow) => row.participantId"
       :row-pinning="{ top: [TOTALS_ROW_PARTICIPANT_ID] }"
       :initial-state="tableInitialState"
       @select="openParticipantDetail"
     >
+      <template #body-top>
+        <StatisticWeightRow
+          :columns="tableColumns"
+          :score-group-factor="scoreGroupFactors?.[kind]"
+          :score-group="kind"
+        />
+      </template>
       <template #displayName-cell="{ row }">
         <span
           v-if="row.original.participantId === TOTALS_ROW_PARTICIPANT_ID"

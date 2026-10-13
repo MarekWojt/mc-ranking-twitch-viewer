@@ -1,7 +1,7 @@
 export async function buildObjectStatisticDetail(
   bareObjectKey: string,
   specificSubgroup: SpecificStatisticSubgroup
-): Promise<DataWithFreshness<ObjectStatisticDetailDto> | null> {
+): Promise<ScoredDataWithFreshness<ObjectStatisticDetailDto> | null> {
   const scoreboard = await computeScoreboard()
   const objectKey = toMinecraftId(bareObjectKey)
   const matchingDefinitions = scoreboard.statisticDefinitions.filter(
@@ -20,6 +20,7 @@ export async function buildObjectStatisticDetail(
     const valueByCategory: Record<string, number> = {}
     const displayValueByCategory: Record<string, string> = {}
     const pointsByCategory: Record<string, number> = {}
+    const pointsWithoutStatisticWeightByCategory: Record<string, number> = {}
     const rankByCategory: Record<string, number> = {}
     let totalValue = 0
     let totalPoints = 0
@@ -31,6 +32,7 @@ export async function buildObjectStatisticDetail(
       displayValueByCategory[definition.category] = formatStatisticDisplayValue(definition.key, value)
       totalValue += value
       pointsByCategory[definition.category] = score?.points ?? 0
+      pointsWithoutStatisticWeightByCategory[definition.category] = score?.pointsWithoutStatisticWeight ?? 0
       totalPoints += score?.points ?? 0
       rankByCategory[definition.category] = score?.rank ?? scoreboard.participants.length
     }
@@ -43,6 +45,7 @@ export async function buildObjectStatisticDetail(
       displayValueByCategory,
       totalValue,
       pointsByCategory,
+      pointsWithoutStatisticWeightByCategory,
       totalPoints,
       rankByCategory
     }
@@ -50,6 +53,7 @@ export async function buildObjectStatisticDetail(
 
   return {
     asOf: scoreboard.asOf,
+    scoreGroupFactors: scoreboard.scoreGroupFactors,
     payload: { objectKey, objectLabel, categories, groupLabelByCategory, participants }
   }
 }

@@ -5,7 +5,7 @@ interface StatisticParticipantScoreEntry {
   value: number
 }
 
-export default defineEventHandler(async (): Promise<DataWithFreshness<StatisticListItemDto[]>> => {
+export default defineEventHandler(async (): Promise<ScoredDataWithFreshness<StatisticListItemDto[]>> => {
   const scoreboard = await computeScoreboard()
 
   const scoresBySlug = new Map<string, StatisticParticipantScoreEntry[]>()
@@ -24,6 +24,7 @@ export default defineEventHandler(async (): Promise<DataWithFreshness<StatisticL
 
   return {
     asOf: scoreboard.asOf,
+    scoreGroupFactors: scoreboard.scoreGroupFactors,
     payload: scoreboard.statisticDefinitions.map((definition): StatisticListItemDto => {
       const scoresForThisStatistic = scoresBySlug.get(definition.slug) ?? []
       const maxValue = Math.max(0, ...scoresForThisStatistic.map(entry => entry.value))

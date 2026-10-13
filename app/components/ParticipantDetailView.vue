@@ -16,7 +16,7 @@ interface ResolvedStatistic {
   value: number
   displayValue: string
   points: number
-  unweightedPoints: number
+  pointsWithoutStatisticWeight: number
   rank: number
   weight: number
   searchText: string
@@ -38,6 +38,7 @@ interface PivotedParticipantActionCell {
   value: number
   displayValue: string
   points: number
+  pointsWithoutStatisticWeight: number
   rank: number
 }
 
@@ -57,7 +58,7 @@ interface PivotedParticipantRow {
 const route = useRoute()
 const participantId = route.params.id as string
 
-const { data: response, refresh } = await useFetch<DataWithFreshness<ParticipantDetailDto>>(`/api/participants/${participantId}`)
+const { data: response, refresh } = await useFetch<ScoredDataWithFreshness<ParticipantDetailDto>>(`/api/participants/${participantId}`)
 
 if (!response.value) {
   throw createError({ statusCode: 404, statusMessage: 'Teilnehmer nicht gefunden' })
@@ -69,6 +70,8 @@ const participant = computed(() => response.value?.payload ?? null)
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
 const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+
+const scoreGroupFactors = computed(() => response.value?.scoreGroupFactors ?? null)
 
 const { resolvedObjectsLocale, resolvedStatisticsLocale, resolvedAdvancementsLocale } = useMinecraftNameLocale()
 
@@ -171,7 +174,7 @@ const generalStatisticThemeGroups = computed<GeneralStatisticThemeGroup[]>(() =>
   }
 
   for (const themeStatistics of statisticsByTheme.values()) {
-    themeStatistics.sort((a, b) => statDisplayMode.value === 'value' ? b.value - a.value : b.unweightedPoints - a.unweightedPoints)
+    themeStatistics.sort((a, b) => statDisplayMode.value === 'value' ? b.value - a.value : b.pointsWithoutStatisticWeight - a.pointsWithoutStatisticWeight)
   }
 
   const orderedThemes = [
@@ -191,10 +194,10 @@ const entityStatistics = computed(() =>
 )
 
 const statisticTabItems = [
-  { label: 'Allgemein', value: 'allgemein', slot: 'allgemein' as const },
-  { label: 'Items', value: 'items', slot: 'items' as const },
-  { label: 'Entities', value: 'entities', slot: 'entities' as const },
-  { label: 'Advancements', value: 'advancements', slot: 'advancements' as const }
+  { label: 'Allgemein', value: 'allgemein', slot: 'allgemein' as const, scoreGroup: 'allgemein' as ScoreGroup },
+  { label: 'Items', value: 'items', slot: 'items' as const, scoreGroup: 'items' as ScoreGroup },
+  { label: 'Entities', value: 'entities', slot: 'entities' as const, scoreGroup: 'entities' as ScoreGroup },
+  { label: 'Advancements', value: 'advancements', slot: 'advancements' as const, scoreGroup: 'advancements' as ScoreGroup }
 ]
 
 const activeStatisticTab = computed({
@@ -234,7 +237,7 @@ const advancementRows = computed<ResolvedAdvancement[]>(() => {
 })
 
 const advancementTableColumns: TableColumn<ResolvedAdvancement>[] = [
-  { accessorKey: 'label', header: 'Advancement', meta: { class: { th: 'h-14' } } },
+  { accessorKey: 'label', header: 'Advancement' },
   { accessorKey: 'groupLabel', header: 'Kategorie', meta: { class: { th: 'text-center', td: 'text-center' } } },
   { accessorKey: 'completedAtDisplay', header: 'Erreicht am', meta: { class: { th: 'text-center', td: 'text-center' } } },
   {
@@ -282,7 +285,7 @@ const generalStatisticTableColumns = computed<TableColumn<ResolvedStatistic>[]>(
     meta: { class: { th: 'w-px whitespace-nowrap text-right', td: 'w-px whitespace-nowrap text-right' } },
     cell: ({ row }) => statDisplayMode.value === 'value'
       ? row.original.displayValue
-      : renderWeightedPoints(row.original.points, row.original.unweightedPoints, row.original.weight)
+      : renderWeightedPoints(row.original.points, row.original.pointsWithoutStatisticWeight, row.original.weight)
   }
 ])
 
@@ -298,6 +301,7 @@ function buildPivotedParticipantRows(statisticsToPivot: ResolvedStatistic[]): Pi
       value: statistic.value,
       displayValue: statistic.displayValue,
       points: statistic.points,
+      pointsWithoutStatisticWeight: statistic.pointsWithoutStatisticWeight,
       rank: statistic.rank
     }
     rowsByObjectKey.set(statistic.key, row)
@@ -339,7 +343,7 @@ function buildActionColumns(
       accessorFn: (row: PivotedParticipantRow) => {
         const cell = row.cellsByActionCategory[category]
         if (!cell) return 0
-        return displayMode === 'value' ? cell.value : cell.points
+        return displayMode === 'value' ? cell.value : cell.pointsWithoutStatisticWeight
       },
       header: ({ column }: { column: SortableColumn }) => renderSortableColumnHeader(column, headerContent),
       cell: ({ row }: { row: { original: PivotedParticipantRow } }) => {
@@ -351,7 +355,7 @@ function buildActionColumns(
           const points = Math.round(cell.points)
           if (!isTotalsRow && points === 0) return '–'
           if (isTotalsRow) return renderBoldTabularNumber(points)
-          return renderRankedValue(points.toLocaleString('de-DE'), cell.rank)
+          return renderRankedValue(formatNumberWithTypographicMinus(points), cell.rank)
         }
 
         if (isTotalsRow) return renderBoldTabularNumber(cell.value)
@@ -384,10 +388,12 @@ const pivotTableRowMeta = {
 function buildTotalsRow(statisticsToPivot: ResolvedStatistic[]): PivotedParticipantRow {
   const valueSumByCategory: Record<string, number> = {}
   const pointsSumByCategory: Record<string, number> = {}
+  const pointsWithoutStatisticWeightSumByCategory: Record<string, number> = {}
   for (const statistic of statisticsToPivot) {
     if (statistic.groupLabel === null) continue
     valueSumByCategory[statistic.category] = (valueSumByCategory[statistic.category] ?? 0) + statistic.value
     pointsSumByCategory[statistic.category] = (pointsSumByCategory[statistic.category] ?? 0) + statistic.points
+    pointsWithoutStatisticWeightSumByCategory[statistic.category] = (pointsWithoutStatisticWeightSumByCategory[statistic.category] ?? 0) + statistic.pointsWithoutStatisticWeight
   }
 
   return {
@@ -397,7 +403,8 @@ function buildTotalsRow(statisticsToPivot: ResolvedStatistic[]): PivotedParticip
       Object.keys(valueSumByCategory).map((category) => {
         const value = valueSumByCategory[category]!
         const points = pointsSumByCategory[category]!
-        return [category, { value, displayValue: value.toLocaleString('de-DE'), points, rank: 0 }]
+        const pointsWithoutStatisticWeight = pointsWithoutStatisticWeightSumByCategory[category]!
+        return [category, { value, displayValue: value.toLocaleString('de-DE'), points, pointsWithoutStatisticWeight, rank: 0 }]
       })
     ),
     totalValue: Object.values(valueSumByCategory).reduce((sum, value) => sum + value, 0),
@@ -588,8 +595,19 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
         variant="link"
         :ui="{ root: 'gap-0', content: 'min-w-0' }"
       >
+        <template #trailing="{ item }">
+          <UTooltip text="Anteil dieser Kategorie an der Gesamtpunktzahl">
+            <span class="cursor-help text-xs font-normal text-muted tabular-nums">{{ formatScoreGroupShare(item.scoreGroup) }}</span>
+          </UTooltip>
+        </template>
         <template #allgemein>
           <div class="mt-6 space-y-6">
+            <ScoreGroupFactorLabel
+              v-if="scoreGroupFactors"
+              variant="notice"
+              :factor="scoreGroupFactors.allgemein"
+              score-group="allgemein"
+            />
             <div
               v-for="themeGroup in generalStatisticThemeGroups"
               :key="themeGroup.theme"
@@ -611,12 +629,20 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
           <UTable
             :data="itemPivotRows"
             :columns="itemPivotColumns"
+            :ui="{ separator: 'hidden', th: 'pb-0 align-bottom' }"
             :meta="pivotTableRowMeta"
             :get-row-id="(row: PivotedParticipantRow) => row.objectKey"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
             :initial-state="pivotTableInitialState"
             @select="openItemDetail"
           >
+            <template #body-top>
+              <StatisticWeightRow
+                :columns="itemPivotColumns"
+                :score-group-factor="scoreGroupFactors?.items"
+                score-group="items"
+              />
+            </template>
             <template #objectLabel-cell="{ row }">
               <span
                 v-if="row.original.objectKey === TOTALS_ROW_OBJECT_KEY"
@@ -636,12 +662,20 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
           <UTable
             :data="entityPivotRows"
             :columns="entityPivotColumns"
+            :ui="{ separator: 'hidden', th: 'pb-0 align-bottom' }"
             :meta="pivotTableRowMeta"
             :get-row-id="(row: PivotedParticipantRow) => row.objectKey"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
             :initial-state="pivotTableInitialState"
             @select="openEntityDetail"
           >
+            <template #body-top>
+              <StatisticWeightRow
+                :columns="entityPivotColumns"
+                :score-group-factor="scoreGroupFactors?.entities"
+                score-group="entities"
+              />
+            </template>
             <template #objectLabel-cell="{ row }">
               <span
                 v-if="row.original.objectKey === TOTALS_ROW_OBJECT_KEY"
@@ -661,11 +695,19 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
           <UTable
             :data="advancementRows"
             :columns="advancementTableColumns"
+            :ui="{ separator: 'hidden', th: 'pb-0 align-bottom' }"
             :meta="advancementsTableRowMeta"
             :get-row-id="(row: ResolvedAdvancement) => row.slug"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
             @select="openAdvancementDetail"
           >
+            <template #body-top>
+              <StatisticWeightRow
+                :columns="advancementTableColumns"
+                :score-group-factor="scoreGroupFactors?.advancements"
+                score-group="advancements"
+              />
+            </template>
             <template #label-cell="{ row }">
               <span
                 v-if="row.original.slug === TOTALS_ROW_OBJECT_KEY"

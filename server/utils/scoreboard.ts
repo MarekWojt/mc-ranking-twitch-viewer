@@ -1,8 +1,15 @@
+interface RawStatisticScore {
+  statistic: StatisticDefinition
+  value: number
+  medianBasedPoints: number
+  rank: number
+}
+
 export interface ParticipantStatisticScore {
   statistic: StatisticDefinition
   value: number
   points: number
-  unweightedPoints: number
+  pointsWithoutStatisticWeight: number
   rank: number
 }
 
@@ -23,6 +30,8 @@ export interface Scoreboard {
   asOf: string
   statisticDefinitions: StatisticDefinition[]
   participants: ScoredParticipant[]
+  advancements: ScoredAdvancement[]
+  scoreGroupFactors: PointsByScoreGroup
 }
 
 export function toOldestFetchedAt(fetchedAtTimestamps: string[]): string {
@@ -74,12 +83,13 @@ export async function computeScoreboard(): Promise<Scoreboard> {
     console.error('Vorab-Laden der Minecraft-Icons im Hintergrund fehlgeschlagen:', error)
   })
 
-  const statisticScoresByParticipantId = new Map<string, ParticipantStatisticScore[]>(
+  const rawStatisticScoresByParticipantId = new Map<string, RawStatisticScore[]>(
     participants.map(participant => [participant.id, []])
   )
-  const totalScoreByParticipantId = new Map<string, number>(
-    participants.map(participant => [participant.id, advancementScoreboard.totalPointsByParticipantId[participant.id] ?? 0])
-  )
+  const scoreGroupPointsByParticipantId = new Map<string, ParticipantScoreGroupPoints>(participants.map(participant => [
+    participant.id,
+    createParticipantScoreGroupPoints(advancementScoreboard.totalPointsByParticipantId[participant.id] ?? 0)
+  ]))
 
   for (const statisticDefinition of statisticDefinitions) {
     const valueByParticipantId = new Map(participants.map(participant => [
@@ -96,16 +106,45 @@ export async function computeScoreboard(): Promise<Scoreboard> {
       ).map(entry => [entry.participantId, entry.rank])
     )
 
+    const scoreGroup = resolveStatisticScoreGroup(statisticDefinition.specificSubgroup)
+
     for (const participant of participants) {
       const value = valueByParticipantId.get(participant.id) ?? 0
-      const unweightedPoints = calculateStatisticPoints(value, medianValue)
-      const points = unweightedPoints * statisticDefinition.weight
+      const medianBasedPoints = calculateStatisticPoints(value, medianValue)
       const rank = rankByParticipantId.get(participant.id)!
 
-      statisticScoresByParticipantId.get(participant.id)?.push({ statistic: statisticDefinition, value, points, unweightedPoints, rank })
-      totalScoreByParticipantId.set(participant.id, (totalScoreByParticipantId.get(participant.id) ?? 0) + points)
+      rawStatisticScoresByParticipantId.get(participant.id)?.push({ statistic: statisticDefinition, value, medianBasedPoints, rank })
+      addToScoreGroupPoints(scoreGroupPointsByParticipantId.get(participant.id)!, scoreGroup, medianBasedPoints * statisticDefinition.weight)
     }
   }
+
+  const scoreGroupFactors = calculateScoreGroupFactors([...scoreGroupPointsByParticipantId.values()])
+
+  const statisticScoresByParticipantId = new Map<string, ParticipantStatisticScore[]>(participants.map(participant => [
+    participant.id,
+    (rawStatisticScoresByParticipantId.get(participant.id) ?? []).map((rawStatisticScore) => {
+      const scoreGroupFactor = scoreGroupFactors[resolveStatisticScoreGroup(rawStatisticScore.statistic.specificSubgroup)]
+      const pointsWithoutStatisticWeight = rawStatisticScore.medianBasedPoints * scoreGroupFactor
+      return {
+        statistic: rawStatisticScore.statistic,
+        value: rawStatisticScore.value,
+        points: pointsWithoutStatisticWeight * rawStatisticScore.statistic.weight,
+        pointsWithoutStatisticWeight,
+        rank: rawStatisticScore.rank
+      }
+    })
+  ]))
+
+  const totalScoreByParticipantId = new Map<string, number>(participants.map((participant) => {
+    const statisticPoints = (statisticScoresByParticipantId.get(participant.id) ?? []).reduce((sum, statisticScore) => sum + statisticScore.points, 0)
+    const advancementPoints = (advancementScoreboard.totalPointsByParticipantId[participant.id] ?? 0) * scoreGroupFactors.advancements
+    return [participant.id, statisticPoints + advancementPoints]
+  }))
+
+  const scaledAdvancements = advancementScoreboard.advancements.map(scoredAdvancement => ({
+    ...scoredAdvancement,
+    points: scoredAdvancement.points * scoreGroupFactors.advancements
+  }))
 
   const rankedParticipants = rankByCompetitionRanking(
     participants.map(participant => ({
@@ -120,6 +159,8 @@ export async function computeScoreboard(): Promise<Scoreboard> {
   return {
     asOf,
     statisticDefinitions,
+    advancements: scaledAdvancements,
+    scoreGroupFactors,
     participants: rankedParticipants.map(({ participant, totalScore, rank }) => {
       const liveStream = participant.twitchLogin !== null ? liveStreamsByTwitchLogin[participant.twitchLogin] : undefined
 
@@ -133,7 +174,7 @@ export async function computeScoreboard(): Promise<Scoreboard> {
         twitchStreamTitle: liveStream?.title ?? null,
         twitchStreamGame: liveStream?.gameName ?? null,
         twitchProfileImageUrl: participant.twitchLogin !== null ? profileImageUrlByTwitchLogin[participant.twitchLogin] ?? null : null,
-        statistics: (statisticScoresByParticipantId.get(participant.id) ?? []).sort((a, b) => b.unweightedPoints - a.unweightedPoints)
+        statistics: (statisticScoresByParticipantId.get(participant.id) ?? []).sort((a, b) => b.pointsWithoutStatisticWeight - a.pointsWithoutStatisticWeight)
       }
     })
   }

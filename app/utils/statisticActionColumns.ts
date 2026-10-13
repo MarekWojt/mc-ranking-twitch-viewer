@@ -1,4 +1,5 @@
 import type { VNodeChild } from 'vue'
+import type { BadgeProps } from '@nuxt/ui'
 import { UBadge } from '#components'
 
 export const ITEM_ACTION_ICON_BY_CATEGORY: Record<string, string> = {
@@ -36,7 +37,7 @@ export function renderSortableColumnHeader(column: SortableColumn, content: VNod
 
 export function renderActionColumnHeaderContent(actionLabel: string, icon: string | null) {
   return h('span', { title: actionLabel, class: 'inline-flex items-center gap-1' }, icon
-    ? [h('span', { class: 'text-lg' }, icon), h('span', {}, actionLabel)]
+    ? [h('span', { class: 'text-lg leading-none' }, icon), h('span', {}, actionLabel)]
     : actionLabel)
 }
 
@@ -48,31 +49,67 @@ export function renderRankedValue(text: string, rank: number) {
   return h('span', { class: 'text-sm tabular-nums', title: `Platz #${rank}` }, text)
 }
 
-export const DEFAULT_STATISTIC_WEIGHT = 1
-
 const NARROW_NO_BREAK_SPACE = '\u202F'
 
 export function formatStatisticWeight(weight: number): string {
   return `×${NARROW_NO_BREAK_SPACE}${formatNumberWithTypographicMinus(weight)}`
 }
 
-export function describeStatisticWeight(weight: number): string {
-  return `Fließt mit Faktor ${formatNumberWithTypographicMinus(weight)} in die Gesamtpunktzahl ein`
+function roundScoreGroupFactorToHundredths(factor: number): number {
+  return Math.round(factor * 100) / 100
 }
 
-export function renderWeightedPoints(points: number, unweightedPoints: number, weight: number): VNodeChild {
+export function formatScoreGroupFactor(factor: number): string {
+  return formatStatisticWeight(roundScoreGroupFactorToHundredths(factor))
+}
+
+export function formatScoreGroupShare(scoreGroup: ScoreGroup): string {
+  return SCORE_GROUP_SHARES[scoreGroup].toLocaleString('de-DE', { style: 'percent' })
+}
+
+export function describeScoreGroupFactor(factor: number, scoreGroup: ScoreGroup): string {
+  return `Alle Punkte dieser Kategorie werden mit ${formatNumberWithTypographicMinus(roundScoreGroupFactorToHundredths(factor))} multipliziert, damit sie etwa ${formatScoreGroupShare(scoreGroup)} der Gesamtpunktzahl ausmachen.`
+}
+
+export function describeStatisticWeight(weight: number): string {
+  return `Faktor ${formatNumberWithTypographicMinus(weight)} für diese Statistik, zusätzlich zum Faktor ihrer Kategorie`
+}
+
+export function describeCategoryWeight(weight: number): string {
+  return `Faktor ${formatNumberWithTypographicMinus(weight)} für diese Aktion, zusätzlich zum Faktor der Kategorie`
+}
+
+export function renderWeightedPoints(points: number, pointsWithoutStatisticWeight: number, weight: number): VNodeChild {
   const formattedPoints = formatRoundedPoints(points)
   if (weight !== 0) return formattedPoints
 
-  const formattedUnweightedPoints = formatRoundedPoints(unweightedPoints)
+  const formattedPointsWithoutStatisticWeight = formatRoundedPoints(pointsWithoutStatisticWeight)
   return h('span', {}, [
     formattedPoints,
-    h('span', { class: 'ml-1 text-muted', title: `Ohne Faktor: ${formattedUnweightedPoints} Punkte` }, `(${formattedUnweightedPoints})`)
+    h('span', { class: 'ml-1 text-muted', title: `Ohne den Faktor dieser Statistik: ${formattedPointsWithoutStatisticWeight} Punkte` }, `(${formattedPointsWithoutStatisticWeight})`)
   ])
 }
 
-export function resolveStatisticWeightBadgeColor(weight: number): 'error' | 'neutral' {
-  return weight < 0 ? 'error' : 'neutral'
+export function resolveStatisticWeightBadgeColor(weight: number): 'error' | 'info' | 'warning' | 'neutral' | 'success' {
+  if (weight < 0) return 'error'
+  if (weight === 0) return 'info'
+  if (weight < DEFAULT_STATISTIC_WEIGHT) return 'warning'
+  if (weight > DEFAULT_STATISTIC_WEIGHT) return 'success'
+  return 'neutral'
+}
+
+export function buildStatisticWeightBadgeProps(weight: number): BadgeProps {
+  return {
+    label: formatStatisticWeight(weight),
+    color: resolveStatisticWeightBadgeColor(weight),
+    variant: 'subtle',
+    size: 'sm',
+    class: 'tabular-nums'
+  }
+}
+
+function renderStatisticWeightBadge(weight: number, description: string): VNodeChild {
+  return h(UBadge, { ...buildStatisticWeightBadgeProps(weight), title: description })
 }
 
 export function renderStatisticLabelWithWeight(label: string, weight: number): VNodeChild {
@@ -80,13 +117,6 @@ export function renderStatisticLabelWithWeight(label: string, weight: number): V
 
   return h('span', { class: 'inline-flex items-center gap-2' }, [
     label,
-    h(UBadge, {
-      label: formatStatisticWeight(weight),
-      color: resolveStatisticWeightBadgeColor(weight),
-      variant: 'subtle',
-      size: 'sm',
-      class: 'tabular-nums',
-      title: describeStatisticWeight(weight)
-    })
+    renderStatisticWeightBadge(weight, describeStatisticWeight(weight))
   ])
 }

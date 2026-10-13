@@ -22,7 +22,7 @@ export interface ParticipantStatisticRowDto {
   value: number
   displayValue: string
   points: number
-  unweightedPoints: number
+  pointsWithoutStatisticWeight: number
   rank: number
   weight: number
 }
@@ -74,7 +74,7 @@ export interface StatisticParticipantRowDto {
   value: number
   displayValue: string
   points: number
-  unweightedPoints: number
+  pointsWithoutStatisticWeight: number
   rank: number
 }
 
@@ -86,7 +86,7 @@ export interface StatisticDetailDto {
   totalValue: number
   totalDisplayValue: string
   totalPoints: number
-  totalUnweightedPoints: number
+  totalPointsWithoutStatisticWeight: number
   participants: StatisticParticipantRowDto[]
   weight: number
 }
@@ -105,6 +105,7 @@ export interface ObjectStatisticParticipantRowDto {
   displayValueByCategory: Record<string, string>
   totalValue: number
   pointsByCategory: Record<string, number>
+  pointsWithoutStatisticWeightByCategory: Record<string, number>
   totalPoints: number
   rankByCategory: Record<string, number>
 }

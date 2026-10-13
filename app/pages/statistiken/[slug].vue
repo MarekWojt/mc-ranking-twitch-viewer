@@ -42,7 +42,7 @@ const statisticParticipantTableColumns: TableColumn<StatisticParticipantRowDto>[
     accessorKey: 'points',
     header: 'Punkte',
     meta: { class: { th: 'w-px whitespace-nowrap text-right', td: 'w-px whitespace-nowrap text-right' } },
-    cell: ({ row }) => renderWeightedPoints(row.original.points, row.original.unweightedPoints, statistic.value?.weight ?? DEFAULT_STATISTIC_WEIGHT)
+    cell: ({ row }) => renderWeightedPoints(row.original.points, row.original.pointsWithoutStatisticWeight, statistic.value?.weight ?? DEFAULT_STATISTIC_WEIGHT)
   }
 ]
 
@@ -56,7 +56,7 @@ const participantRows = computed<StatisticParticipantRowDto[]>(() => {
     value: statistic.value.totalValue,
     displayValue: statistic.value.totalDisplayValue,
     points: statistic.value.totalPoints,
-    unweightedPoints: statistic.value.totalUnweightedPoints,
+    pointsWithoutStatisticWeight: statistic.value.totalPointsWithoutStatisticWeight,
     rank: 0
   }
 

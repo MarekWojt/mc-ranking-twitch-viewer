@@ -1,4 +1,4 @@
-export default defineEventHandler(async (event): Promise<DataWithFreshness<ObjectStatisticDetailDto>> => {
+export default defineEventHandler(async (event): Promise<ScoredDataWithFreshness<ObjectStatisticDetailDto>> => {
   const bareKey = getRouterParam(event, 'key')
   const result = bareKey ? await buildObjectStatisticDetail(bareKey, 'items') : null
 

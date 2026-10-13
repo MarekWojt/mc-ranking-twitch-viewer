@@ -6,7 +6,7 @@ export default defineEventHandler(async (event): Promise<DataWithFreshness<Advan
     throw createError({ statusCode: 404, statusMessage: 'Advancement nicht gefunden' })
   }
 
-  const scoreboard = await computeAdvancementScoreboard()
+  const scoreboard = await loadScoredAdvancements()
   const scoredAdvancement = scoreboard.advancements.find(entry => entry.definition.id === advancementId)
 
   if (!scoredAdvancement) {

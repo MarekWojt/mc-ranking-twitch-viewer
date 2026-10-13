@@ -1,5 +1,3 @@
-const STATISTIC_WEIGHT_DEFAULT = 1
-
 // keyed by bare statistic key only (not category) to avoid a module-init-order circular
 // dependency with statisticDefinitions.ts's GENERAL_STATISTIC_CATEGORY constant
 const STATISTIC_WEIGHTS_BY_KEY: Record<string, number> = {
@@ -10,6 +8,6 @@ const STATISTIC_WEIGHTS_BY_KEY: Record<string, number> = {
   'minecraft:player_kills': 0
 }
 
-export function resolveStatisticWeight(_category: string, key: string): number {
-  return STATISTIC_WEIGHTS_BY_KEY[key] ?? STATISTIC_WEIGHT_DEFAULT
+export function resolveStatisticWeight(category: string, key: string): number {
+  return STATISTIC_WEIGHTS_BY_KEY[key] ?? resolveCategoryWeight(category)
 }

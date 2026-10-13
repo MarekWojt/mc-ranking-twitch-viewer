@@ -1,5 +1,5 @@
-export default defineEventHandler(async (): Promise<DataWithFreshness<AdvancementListItemDto[]>> => {
-  const scoreboard = await computeAdvancementScoreboard()
+export default defineEventHandler(async (): Promise<ScoredDataWithFreshness<AdvancementListItemDto[]>> => {
+  const scoreboard = await loadScoredAdvancements()
 
   const advancements = scoreboard.advancements
     .map(scoredAdvancement => ({ scoredAdvancement, mostRecentCompletedAt: mostRecentAdvancementCompletionTimestamp(scoredAdvancement) }))
@@ -19,5 +19,5 @@ export default defineEventHandler(async (): Promise<DataWithFreshness<Advancemen
       mostRecentCompletedAtDisplay: formatAdvancementCompletedAt(mostRecentCompletedAt)
     }))
 
-  return { asOf: scoreboard.asOf, payload: advancements }
+  return { asOf: scoreboard.asOf, scoreGroupFactors: scoreboard.scoreGroupFactors, payload: advancements }
 })

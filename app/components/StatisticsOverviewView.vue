@@ -57,10 +57,10 @@ interface PivotedStatisticRow {
 }
 
 const statisticTabItems = [
-  { label: 'Allgemein', value: 'allgemein', slot: 'allgemein' as const },
-  { label: 'Items', value: 'items', slot: 'items' as const },
-  { label: 'Entities', value: 'entities', slot: 'entities' as const },
-  { label: 'Advancements', value: 'advancements', slot: 'advancements' as const }
+  { label: 'Allgemein', value: 'allgemein', slot: 'allgemein' as const, scoreGroup: 'allgemein' as ScoreGroup },
+  { label: 'Items', value: 'items', slot: 'items' as const, scoreGroup: 'items' as ScoreGroup },
+  { label: 'Entities', value: 'entities', slot: 'entities' as const, scoreGroup: 'entities' as ScoreGroup },
+  { label: 'Advancements', value: 'advancements', slot: 'advancements' as const, scoreGroup: 'advancements' as ScoreGroup }
 ]
 
 const { resolvedObjectsLocale, resolvedStatisticsLocale, resolvedAdvancementsLocale } = useMinecraftNameLocale()
@@ -78,13 +78,15 @@ const activeStatisticTab = computed({
   set: (newTab: string) => navigateTo({ path: `/statistiken/${newTab}`, query: currentQueryOverrides() })
 })
 
-const { data: response, refresh } = await useFetch<DataWithFreshness<StatisticListItemDto[]>>('/api/statistics')
+const { data: response, refresh } = await useFetch<ScoredDataWithFreshness<StatisticListItemDto[]>>('/api/statistics')
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 
-const { data: advancementsResponse, refresh: refreshAdvancements } = await useFetch<DataWithFreshness<AdvancementListItemDto[]>>('/api/advancements')
+const { data: advancementsResponse, refresh: refreshAdvancements } = await useFetch<ScoredDataWithFreshness<AdvancementListItemDto[]>>('/api/advancements')
 useAutoRefresh(refreshAdvancements, DATA_POLLING_INTERVAL_MILLISECONDS)
 
 const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+
+const scoreGroupFactors = computed(() => response.value?.scoreGroupFactors ?? null)
 
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
@@ -251,7 +253,7 @@ const advancementRows = computed<ResolvedAdvancement[]>(() => {
 })
 
 const advancementTableColumns: TableColumn<ResolvedAdvancement>[] = [
-  { accessorKey: 'label', header: 'Advancement', meta: { class: { th: 'h-14' } } },
+  { accessorKey: 'label', header: 'Advancement' },
   { accessorKey: 'groupLabel', header: 'Kategorie', meta: { class: { th: 'text-center', td: 'text-center' } } },
   { accessorKey: 'mostRecentCompletedAtDisplay', header: 'Zuletzt erreicht', meta: { class: { th: 'text-center', td: 'text-center' } } },
   {
@@ -514,8 +516,19 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
         variant="link"
         :ui="{ root: 'gap-0', content: 'min-w-0' }"
       >
+        <template #trailing="{ item }">
+          <UTooltip text="Anteil dieser Kategorie an der Gesamtpunktzahl">
+            <span class="cursor-help text-xs font-normal text-muted tabular-nums">{{ formatScoreGroupShare(item.scoreGroup) }}</span>
+          </UTooltip>
+        </template>
         <template #allgemein>
           <div class="mt-6 space-y-6">
+            <ScoreGroupFactorLabel
+              v-if="scoreGroupFactors"
+              variant="notice"
+              :factor="scoreGroupFactors.allgemein"
+              score-group="allgemein"
+            />
             <div
               v-for="themeGroup in generalStatisticThemeGroups"
               :key="themeGroup.theme"
@@ -538,11 +551,19 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
             v-model:sorting="pivotSorting"
             :data="itemPivotRows"
             :columns="itemPivotColumns"
+            :ui="{ separator: 'hidden', th: 'pb-0 align-bottom' }"
             :meta="pivotTableRowMeta"
             :get-row-id="(row: PivotedStatisticRow) => row.objectKey"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
             @select="openItemDetail"
           >
+            <template #body-top>
+              <StatisticWeightRow
+                :columns="itemPivotColumns"
+                :score-group-factor="scoreGroupFactors?.items"
+                score-group="items"
+              />
+            </template>
             <template #objectLabel-cell="{ row }">
               <span
                 v-if="row.original.objectKey === TOTALS_ROW_OBJECT_KEY"
@@ -563,11 +584,19 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
             v-model:sorting="pivotSorting"
             :data="entityPivotRows"
             :columns="entityPivotColumns"
+            :ui="{ separator: 'hidden', th: 'pb-0 align-bottom' }"
             :meta="pivotTableRowMeta"
             :get-row-id="(row: PivotedStatisticRow) => row.objectKey"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
             @select="openEntityDetail"
           >
+            <template #body-top>
+              <StatisticWeightRow
+                :columns="entityPivotColumns"
+                :score-group-factor="scoreGroupFactors?.entities"
+                score-group="entities"
+              />
+            </template>
             <template #objectLabel-cell="{ row }">
               <span
                 v-if="row.original.objectKey === TOTALS_ROW_OBJECT_KEY"
@@ -587,11 +616,19 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
           <UTable
             :data="advancementRows"
             :columns="advancementTableColumns"
+            :ui="{ separator: 'hidden', th: 'pb-0 align-bottom' }"
             :meta="advancementsTableRowMeta"
             :get-row-id="(row: ResolvedAdvancement) => row.slug"
             :row-pinning="{ top: [TOTALS_ROW_OBJECT_KEY] }"
             @select="openAdvancementDetail"
           >
+            <template #body-top>
+              <StatisticWeightRow
+                :columns="advancementTableColumns"
+                :score-group-factor="advancementsResponse?.scoreGroupFactors.advancements"
+                score-group="advancements"
+              />
+            </template>
             <template #label-cell="{ row }">
               <span
                 v-if="row.original.slug === TOTALS_ROW_OBJECT_KEY"
