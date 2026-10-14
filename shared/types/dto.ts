@@ -9,6 +9,8 @@ export interface ParticipantListItemDto {
   twitchLogin: string | null
   isLiveOnTwitch: boolean
   twitchProfileImageUrl: string | null
+  twitchStreamTitle: string | null
+  twitchStreamGame: string | null
 }
 
 export interface ParticipantStatisticRowDto {
@@ -39,8 +41,6 @@ export interface ParticipantAdvancementRowDto {
 }
 
 export interface ParticipantDetailDto extends ParticipantListItemDto {
-  twitchStreamTitle: string | null
-  twitchStreamGame: string | null
   statistics: ParticipantStatisticRowDto[]
   advancements: ParticipantAdvancementRowDto[]
 }

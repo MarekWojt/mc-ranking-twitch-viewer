@@ -41,6 +41,7 @@ const navigationItems = [
       <UNavigationMenu :items="navigationItems" />
 
       <template #right>
+        <RaidPicker />
         <AppSettingsMenu />
       </template>
 

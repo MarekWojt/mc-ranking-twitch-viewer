@@ -1,6 +1,5 @@
 <script setup lang="ts">
-const { data: response, refresh } = await useFetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants')
-useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
+const response = await usePolledParticipantList()
 
 const participants = computed(() => response.value?.payload ?? [])
 const dataAsOf = computed(() => response.value?.asOf ?? null)

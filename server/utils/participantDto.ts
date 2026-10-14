@@ -9,7 +9,9 @@ export function toParticipantListItemDto(scoredParticipant: ScoredParticipant): 
     isOnlineOnMinecraftServer: scoredParticipant.isOnlineOnMinecraftServer,
     twitchLogin: scoredParticipant.participant.twitchLogin,
     isLiveOnTwitch: scoredParticipant.isLiveOnTwitch,
-    twitchProfileImageUrl: scoredParticipant.twitchProfileImageUrl
+    twitchProfileImageUrl: scoredParticipant.twitchProfileImageUrl,
+    twitchStreamTitle: scoredParticipant.twitchStreamTitle,
+    twitchStreamGame: scoredParticipant.twitchStreamGame
   }
 }
 
@@ -49,8 +51,6 @@ export function toParticipantAdvancementRowDto(scoredAdvancement: ScoredAdvancem
 export function toParticipantDetailDto(scoredParticipant: ScoredParticipant, advancements: ParticipantAdvancementRowDto[]): ParticipantDetailDto {
   return {
     ...toParticipantListItemDto(scoredParticipant),
-    twitchStreamTitle: scoredParticipant.twitchStreamTitle,
-    twitchStreamGame: scoredParticipant.twitchStreamGame,
     statistics: scoredParticipant.statistics.map(toParticipantStatisticRowDto),
     advancements
   }
