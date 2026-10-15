@@ -66,8 +66,19 @@ const mojangSessionProfileCacheOptions = {
 
 const resolveMojangSessionProfile = defineCachedFunction(fetchMojangSessionProfile, mojangSessionProfileCacheOptions)
 
+const lastConfirmedMinecraftNamesByUuid = new Map<string, string>()
+
 export async function resolveMinecraftNameFromUuid(minecraftUuid: string): Promise<string> {
-  return (await resolveMojangSessionProfile(minecraftUuid)).name
+  const minecraftName = (await resolveMojangSessionProfile(minecraftUuid)).name
+  lastConfirmedMinecraftNamesByUuid.set(minecraftUuid, minecraftName)
+  return minecraftName
+}
+
+// confirming every configured name takes about 40 s after a server start because of Mojang's rate limit, so callers
+// that already have a usable name get the last confirmed spelling right away while the confirmation runs in the background
+export function getLastConfirmedMinecraftNameWhileConfirmingInBackground(minecraftUuid: string, onConfirmationError: (error: unknown) => void): string | undefined {
+  resolveMinecraftNameFromUuid(minecraftUuid).catch(onConfirmationError)
+  return lastConfirmedMinecraftNamesByUuid.get(minecraftUuid)
 }
 
 export async function resolveMinecraftSkinInfo(minecraftUuid: string): Promise<MinecraftSkinInfo | null> {

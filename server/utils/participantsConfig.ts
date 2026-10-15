@@ -92,17 +92,15 @@ async function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entr
   }
 
   if (resolvedEntry.minecraftName && resolvedEntry.minecraftUuid && !wasMinecraftNameDerived) {
-    try {
-      const canonicalMinecraftName = await resolveMinecraftNameFromUuid(resolvedEntry.minecraftUuid)
-      if (canonicalMinecraftName !== resolvedEntry.minecraftName) {
-        resolvedEntry.minecraftName = canonicalMinecraftName
-        wasMinecraftNameDerived = true
-      }
-    } catch (error) {
+    const canonicalMinecraftName = getLastConfirmedMinecraftNameWhileConfirmingInBackground(resolvedEntry.minecraftUuid, (error) => {
       console.error(
         `${describeParticipantConfigEntryForErrors(entry, entryIndex)}: aktuelle Schreibweise von minecraftName konnte nicht über Mojang bestätigt werden, bisheriger Wert bleibt bestehen`,
         error
       )
+    })
+    if (canonicalMinecraftName && canonicalMinecraftName !== resolvedEntry.minecraftName) {
+      resolvedEntry.minecraftName = canonicalMinecraftName
+      wasMinecraftNameDerived = true
     }
   }
 
