@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { de } from '@nuxt/ui/locale'
 
-const { serverName } = useRuntimeConfig().public
+const { serverName, showServerNameNextToLogo } = useRuntimeConfig().public
 
 useHead({
   htmlAttrs: { lang: 'de' },
@@ -34,7 +34,7 @@ const navigationItems = [
           class="focus-visible:outline-3 outline-primary/25 rounded-md p-1 -ms-1 flex items-center gap-2 font-semibold"
         >
           <AppLogo />
-          {{ serverName }}
+          <span v-if="showServerNameNextToLogo">{{ serverName }}</span>
         </NuxtLink>
       </template>
 

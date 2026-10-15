@@ -24,7 +24,8 @@ export default defineNuxtConfig({
     minecraftOnlineStatusCacheTtlSeconds: 15,
     minecraftStatsCacheTtlSeconds: 300,
     public: {
-      serverName: 'Minecraft Server'
+      serverName: 'Minecraft Server',
+      showServerNameNextToLogo: true
     }
   },
 
