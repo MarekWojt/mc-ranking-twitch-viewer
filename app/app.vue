@@ -33,7 +33,7 @@ const navigationItems = [
           to="/"
           class="focus-visible:outline-3 outline-primary/25 rounded-md p-1 -ms-1 flex items-center gap-2 font-semibold"
         >
-          <AppLogo class="w-auto h-6 shrink-0" />
+          <AppLogo />
           {{ serverName }}
         </NuxtLink>
       </template>

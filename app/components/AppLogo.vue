@@ -9,6 +9,6 @@ const SERVER_LOGO_PATH = '/branding/logo'
   <img
     :src="SERVER_LOGO_PATH"
     :alt="serverName"
-    class="h-full w-auto"
+    class="h-6 w-auto max-w-40 shrink-0 object-contain"
   >
 </template>
