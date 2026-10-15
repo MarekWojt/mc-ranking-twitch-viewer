@@ -17,13 +17,13 @@ export default defineNuxtConfig({
     minecraftStatsDirectoryPath: '',
     minecraftAdvancementsDirectoryPath: '',
     minecraftOnlinePlayersFilePath: '',
+    serverLogoFilePath: '',
+    serverFaviconFilePath: '',
     twitchLiveStatusCacheTtlSeconds: 30,
     minecraftOnlineStatusCacheTtlSeconds: 15,
     minecraftStatsCacheTtlSeconds: 300,
     public: {
-      serverName: 'Minecraft Server',
-      serverLogoUrl: '/favicon.ico',
-      serverFaviconUrl: '/favicon.ico'
+      serverName: 'Minecraft Server'
     }
   },
 

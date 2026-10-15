@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { de } from '@nuxt/ui/locale'
 
-const { serverName, serverFaviconUrl } = useRuntimeConfig().public
+const { serverName } = useRuntimeConfig().public
 
 useHead({
   htmlAttrs: { lang: 'de' },
@@ -9,7 +9,7 @@ useHead({
     { name: 'viewport', content: 'width=device-width, initial-scale=1' }
   ],
   link: [
-    { rel: 'icon', href: serverFaviconUrl }
+    { rel: 'icon', href: '/branding/favicon' }
   ]
 })
 
