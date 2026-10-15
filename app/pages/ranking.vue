@@ -6,10 +6,10 @@ const response = await usePolledParticipantList()
 const participants = computed(() => response.value?.payload ?? [])
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
-const failedMinecraftHeadRenderUuids = ref(new Set<string>())
+const failedMinecraftAvatarRenderUuids = ref(new Set<string>())
 
-function markMinecraftHeadRenderFailed(minecraftUuid: string) {
-  failedMinecraftHeadRenderUuids.value.add(minecraftUuid)
+function markMinecraftAvatarRenderFailed(minecraftUuid: string) {
+  failedMinecraftAvatarRenderUuids.value.add(minecraftUuid)
 }
 
 const podiumRanks = computed(() => {
@@ -68,12 +68,12 @@ function openParticipantDetail(_event: Event, row: { original: ParticipantListIt
       <template #displayName-cell="{ row }">
         <div class="flex items-center gap-2">
           <img
-            v-if="!failedMinecraftHeadRenderUuids.has(row.original.minecraftUuid)"
-            :src="buildMinecraftAvatarRenderUrl(row.original.minecraftUuid, 'head')"
-            :alt="`Minecraft-Kopf von ${row.original.displayName}`"
+            v-if="!failedMinecraftAvatarRenderUuids.has(row.original.minecraftUuid)"
+            :src="buildMinecraftAvatarRenderUrl(row.original.minecraftUuid, 'avatar')"
+            :alt="`Minecraft-Avatar von ${row.original.displayName}`"
             class="size-8 rounded"
             loading="lazy"
-            @error="markMinecraftHeadRenderFailed(row.original.minecraftUuid)"
+            @error="markMinecraftAvatarRenderFailed(row.original.minecraftUuid)"
           >
           <UIcon
             v-else
