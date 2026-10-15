@@ -13,9 +13,14 @@ interface ResolvedParticipantConfigEntry extends ParticipantConfigEntry {
   minecraftUuid: string
 }
 
-const participantsConfigFilePath = resolve(process.cwd(), 'participants.toml')
+const DEFAULT_PARTICIPANTS_CONFIG_FILE_PATH = 'participants.toml'
+
+function resolveParticipantsConfigFilePath(): string {
+  return resolve(process.cwd(), useRuntimeConfig().participantsConfigFilePath || DEFAULT_PARTICIPANTS_CONFIG_FILE_PATH)
+}
 
 async function readParticipantsConfigFile(): Promise<string> {
+  const participantsConfigFilePath = resolveParticipantsConfigFilePath()
   try {
     return await readFile(participantsConfigFilePath, 'utf8')
   } catch (error) {
@@ -47,7 +52,7 @@ async function writeParticipantsConfigFileFromScratch(entryResolutions: Particip
     completion ? toOrderedTomlEntry(completion.entry) : rawEntry
   )
   const tomlContents = stringifyToml({ participants: tomlEntries })
-  await writeFile(participantsConfigFilePath, tomlContents, 'utf8')
+  await writeFile(resolveParticipantsConfigFilePath(), tomlContents, 'utf8')
 }
 
 function describeParticipantConfigEntryForErrors(entry: ParticipantConfigEntry, entryIndex: number): string {
@@ -228,7 +233,7 @@ export const loadParticipants = defineCachedFunction(async (): Promise<Timestamp
     if (patchedFileContents === null) {
       await writeParticipantsConfigFileFromScratch([...configuredEntryResolutions, ...discoveredEntryResolutions])
     } else {
-      await writeFile(participantsConfigFilePath, patchedFileContents, 'utf8')
+      await writeFile(resolveParticipantsConfigFilePath(), patchedFileContents, 'utf8')
     }
   }
 

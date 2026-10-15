@@ -17,6 +17,7 @@ export default defineNuxtConfig({
     minecraftStatsDirectoryPath: '',
     minecraftAdvancementsDirectoryPath: '',
     minecraftOnlinePlayersFilePath: '',
+    participantsConfigFilePath: 'participants.toml',
     serverLogoFilePath: '',
     serverFaviconFilePath: '',
     twitchLiveStatusCacheTtlSeconds: 30,
