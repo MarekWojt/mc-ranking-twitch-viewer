@@ -127,6 +127,9 @@ type StatDisplayMode = 'value' | 'points'
 const statDisplayMode = ref<StatDisplayMode>('value')
 
 const statisticsSearchQuery = ref('')
+const tabBarContainer = useTemplateRef<HTMLElement>('tabBarContainer')
+const tabBarControls = useTemplateRef<HTMLElement>('tabBarControls')
+const doTabBarControlsFitBesideTabs = useFitsBesideTabList(tabBarContainer, tabBarControls)
 
 const filteredStatistics = computed(() => {
   const searchQuery = statisticsSearchQuery.value.trim().toLowerCase()
@@ -588,12 +591,15 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
       </UCard>
     </component>
 
-    <div class="relative">
+    <div
+      ref="tabBarContainer"
+      class="relative flex flex-col"
+    >
       <UTabs
         v-model="activeStatisticTab"
         :items="statisticTabItems"
         variant="link"
-        :ui="{ root: 'gap-0', content: 'min-w-0' }"
+        :ui="STATISTIC_TABS_UI"
       >
         <template #trailing="{ item }">
           <UTooltip text="Anteil dieser Kategorie an der Gesamtpunktzahl">
@@ -737,7 +743,11 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
         </template>
       </UTabs>
 
-      <div class="absolute right-0 top-1 flex h-8 items-center gap-3">
+      <div
+        ref="tabBarControls"
+        class="flex min-h-8 flex-wrap items-center justify-end gap-3"
+        :class="doTabBarControlsFitBesideTabs ? 'absolute right-0 top-1' : 'order-first mb-3 max-w-full self-end'"
+      >
         <UInput
           v-model="statisticsSearchQuery"
           icon="i-lucide-search"

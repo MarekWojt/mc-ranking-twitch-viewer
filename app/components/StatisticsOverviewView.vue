@@ -155,6 +155,9 @@ function findAdvancementIconSrc(slug: string): string | null {
 }
 
 const statisticsSearchQuery = ref('')
+const tabBarContainer = useTemplateRef<HTMLElement>('tabBarContainer')
+const tabBarControls = useTemplateRef<HTMLElement>('tabBarControls')
+const doTabBarControlsFitBesideTabs = useFitsBesideTabList(tabBarContainer, tabBarControls)
 
 const filteredStatistics = computed(() => {
   const searchQuery = statisticsSearchQuery.value.trim().toLowerCase()
@@ -509,12 +512,15 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
       </div>
     </div>
 
-    <div class="relative">
+    <div
+      ref="tabBarContainer"
+      class="relative flex flex-col"
+    >
       <UTabs
         v-model="activeStatisticTab"
         :items="statisticTabItems"
         variant="link"
-        :ui="{ root: 'gap-0', content: 'min-w-0' }"
+        :ui="STATISTIC_TABS_UI"
       >
         <template #trailing="{ item }">
           <UTooltip text="Anteil dieser Kategorie an der Gesamtpunktzahl">
@@ -659,37 +665,42 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
       </UTabs>
 
       <div
-        v-if="activeTab !== 'advancements'"
-        class="absolute right-0 top-1 flex h-8 items-center gap-3 text-sm"
+        ref="tabBarControls"
+        :class="doTabBarControlsFitBesideTabs ? 'absolute right-0 top-1' : 'order-first mb-3 max-w-full self-end'"
       >
-        <button
-          type="button"
-          class="font-medium transition-colors"
-          :class="pivotValueMode === 'max' ? 'text-primary' : 'text-muted hover:text-default'"
-          @click="pivotValueMode = 'max'"
+        <div
+          v-if="activeTab !== 'advancements'"
+          class="flex h-8 items-center gap-3 text-sm"
         >
-          Bestwert
-        </button>
-        <button
-          type="button"
-          class="font-medium transition-colors"
-          :class="pivotValueMode === 'total' ? 'text-primary' : 'text-muted hover:text-default'"
-          @click="pivotValueMode = 'total'"
-        >
-          Summe
-        </button>
-      </div>
+          <button
+            type="button"
+            class="font-medium transition-colors"
+            :class="pivotValueMode === 'max' ? 'text-primary' : 'text-muted hover:text-default'"
+            @click="pivotValueMode = 'max'"
+          >
+            Bestwert
+          </button>
+          <button
+            type="button"
+            class="font-medium transition-colors"
+            :class="pivotValueMode === 'total' ? 'text-primary' : 'text-muted hover:text-default'"
+            @click="pivotValueMode = 'total'"
+          >
+            Summe
+          </button>
+        </div>
 
-      <div
-        v-if="activeTab === 'advancements'"
-        class="absolute right-0 top-1 flex h-8 items-center"
-      >
-        <USelect
-          v-model="selectedAdvancementCategory"
-          :items="advancementCategoryFilterItems"
-          size="sm"
-          class="w-36"
-        />
+        <div
+          v-if="activeTab === 'advancements'"
+          class="flex h-8 items-center"
+        >
+          <USelect
+            v-model="selectedAdvancementCategory"
+            :items="advancementCategoryFilterItems"
+            size="sm"
+            class="w-36"
+          />
+        </div>
       </div>
     </div>
   </UContainer>
