@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname, resolve } from 'node:path'
+
 interface TwitchGetUsersResponseEntry {
   login: string
   display_name: string
@@ -32,19 +36,17 @@ export const resolveTwitchDisplayNameFromLogin = defineCachedFunction(async (twi
   return profile.display_name
 }, twitchDisplayNameFromLoginCacheOptions)
 
+const LAST_KNOWN_TWITCH_PROFILE_IMAGE_URLS_FILE_PATH = resolve(process.cwd(), '.data/twitch-profile-image-urls.json')
+
 const twitchUserProfileCacheOptions = {
   name: 'twitch-user-profiles',
-  getKey: () => 'all',
+  // keyed by the login list, so participants added to participants.toml get their picture right away instead of after
+  // the cached list of everyone else expires
+  getKey: (twitchLogins: string[]) => createHash('sha256').update(twitchLogins.join('\n')).digest('hex'),
   maxAge: 60 * 60
 }
 
-export const getTwitchProfileImageUrlsByLogin = defineCachedFunction(async (): Promise<TimestampedValue<Record<string, string>>> => {
-  const { value: participants } = await loadParticipants()
-  const twitchLogins = [...new Set(
-    participants
-      .map(participant => participant.twitchLogin)
-      .filter((twitchLogin): twitchLogin is string => twitchLogin !== null)
-  )]
+const fetchTwitchProfileImageUrlsByLogin = defineCachedFunction(async (twitchLogins: string[]): Promise<TimestampedValue<Record<string, string>>> => {
   if (twitchLogins.length === 0) return { value: {}, fetchedAt: new Date().toISOString() }
 
   const batches = splitIntoBatches(twitchLogins, TWITCH_HELIX_LOGIN_BATCH_SIZE)
@@ -53,5 +55,35 @@ export const getTwitchProfileImageUrlsByLogin = defineCachedFunction(async (): P
   const profileImageUrlByTwitchLogin = Object.fromEntries(
     batchResults.flat().map(entry => [entry.login.toLowerCase(), entry.profile_image_url])
   )
-  return { value: profileImageUrlByTwitchLogin, fetchedAt: new Date().toISOString() }
+  const profileImageUrls = { value: profileImageUrlByTwitchLogin, fetchedAt: new Date().toISOString() }
+  await mkdir(dirname(LAST_KNOWN_TWITCH_PROFILE_IMAGE_URLS_FILE_PATH), { recursive: true })
+  await writeFile(LAST_KNOWN_TWITCH_PROFILE_IMAGE_URLS_FILE_PATH, JSON.stringify(profileImageUrls))
+  return profileImageUrls
 }, twitchUserProfileCacheOptions)
+
+async function readLastKnownTwitchProfileImageUrls(): Promise<TimestampedValue<Record<string, string>> | null> {
+  try {
+    return JSON.parse(await readFile(LAST_KNOWN_TWITCH_PROFILE_IMAGE_URLS_FILE_PATH, 'utf8')) as TimestampedValue<Record<string, string>>
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw error
+  }
+}
+
+// without this a Twitch outage (or a request right after a restart failing) replaces every profile picture with a placeholder
+export async function getTwitchProfileImageUrlsByLogin(): Promise<TimestampedValue<Record<string, string>>> {
+  const { value: participants } = await loadParticipants()
+  const sortedTwitchLogins = [...new Set(
+    participants
+      .map(participant => participant.twitchLogin?.toLowerCase())
+      .filter((twitchLogin): twitchLogin is string => twitchLogin !== undefined)
+  )].sort()
+  try {
+    return await fetchTwitchProfileImageUrlsByLogin(sortedTwitchLogins)
+  } catch (error) {
+    const lastKnownProfileImageUrls = await readLastKnownTwitchProfileImageUrls()
+    if (!lastKnownProfileImageUrls) throw error
+    console.error('Twitch-Profilbilder konnten nicht abgerufen werden, nutze die zuletzt bekannten:', error)
+    return lastKnownProfileImageUrls
+  }
+}

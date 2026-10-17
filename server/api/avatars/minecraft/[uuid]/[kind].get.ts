@@ -15,19 +15,27 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Ungültige Avatar-Art' })
   }
 
-  let pngBytes: Buffer | null
+  let avatarRender: MinecraftAvatarRender | null
   try {
-    pngBytes = await getMinecraftAvatarRender(normalizeMinecraftUuid(uuidParam), kindParam)
+    avatarRender = await getMinecraftAvatarRender(normalizeMinecraftUuid(uuidParam), kindParam)
   } catch (error) {
     console.error(`Minecraft-Avatar (${kindParam}) für ${uuidParam} konnte nicht gerendert werden:`, error)
     throw createError({ statusCode: 502, statusMessage: 'Avatar konnte nicht gerendert werden' })
   }
 
-  if (pngBytes === null) {
+  if (avatarRender === null) {
     throw createError({ statusCode: 404, statusMessage: 'Avatar nicht gefunden' })
   }
 
+  const entityTag = `"${avatarRender.renderId}"`
+  setResponseHeader(event, 'ETag', entityTag)
+  // browsers keep showing the image they have while checking for a new skin in the background
+  setResponseHeader(event, 'Cache-Control', 'public, max-age=300, stale-while-revalidate=604800')
+  if (getRequestHeader(event, 'if-none-match') === entityTag) {
+    setResponseStatus(event, 304)
+    return null
+  }
+
   setResponseHeader(event, 'Content-Type', 'image/png')
-  setResponseHeader(event, 'Cache-Control', 'public, max-age=86400')
-  return pngBytes
+  return avatarRender.pngBytes
 })

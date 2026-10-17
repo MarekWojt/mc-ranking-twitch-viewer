@@ -37,25 +37,11 @@ async function downloadSkinTextureBytes(skinTextureUrl: string): Promise<Buffer>
   return bytes
 }
 
-export interface MinecraftSkinBytes {
-  bytes: Buffer
-  isSlimModel: boolean
-}
-
-async function isKnownParticipantMinecraftUuid(minecraftUuid: string): Promise<boolean> {
+export async function isKnownParticipantMinecraftUuid(minecraftUuid: string): Promise<boolean> {
   const { value: participants } = await loadParticipants()
   return participants.some(participant => participant.minecraftUuid === minecraftUuid)
 }
 
-export async function getMinecraftSkinBytes(minecraftUuid: string): Promise<MinecraftSkinBytes | null> {
-  if (!(await isKnownParticipantMinecraftUuid(minecraftUuid))) {
-    console.error(`Minecraft-Avatar-Anfrage für unbekannte UUID abgelehnt, Person ist nicht in participants.toml gelistet: ${minecraftUuid}`)
-    return null
-  }
-
-  const skinInfo = await resolveMinecraftSkinInfo(minecraftUuid)
-  if (skinInfo === null) return null
-
-  const bytes = await skinTextureDownloadQueue(() => downloadSkinTextureBytes(skinInfo.skinTextureUrl))
-  return { bytes, isSlimModel: skinInfo.isSlimModel }
+export function downloadMinecraftSkinTexture(skinTextureUrl: string): Promise<Buffer> {
+  return skinTextureDownloadQueue(() => downloadSkinTextureBytes(skinTextureUrl))
 }

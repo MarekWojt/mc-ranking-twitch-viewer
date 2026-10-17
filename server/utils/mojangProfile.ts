@@ -61,7 +61,8 @@ async function fetchMojangSessionProfile(minecraftUuid: string): Promise<MojangS
 const mojangSessionProfileCacheOptions = {
   name: 'mojang-session-profile',
   getKey: (minecraftUuid: string) => minecraftUuid,
-  maxAge: 60 * 60 * 24
+  // also decides how soon a changed skin shows up; renders are only redone when the skin texture actually differs
+  maxAge: 60 * 60
 }
 
 const resolveMojangSessionProfile = defineCachedFunction(fetchMojangSessionProfile, mojangSessionProfileCacheOptions)
