@@ -62,7 +62,8 @@ async function readPlayerCompletedAdvancements(minecraftUuid: string): Promise<C
 const minecraftAdvancementsCacheOptions = {
   name: 'minecraft-player-advancements',
   getKey: () => 'all',
-  maxAge: useRuntimeConfig().minecraftStatsCacheTtlSeconds
+  maxAge: useRuntimeConfig().minecraftStatsCacheTtlSeconds,
+  ...FRESH_DATA_CACHE_OPTIONS
 }
 
 export const loadAllPlayerAdvancements = defineCachedFunction(async (): Promise<TimestampedValue<Record<string, CompletedAdvancement[]>>> => {

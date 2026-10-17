@@ -4,17 +4,26 @@ function useParticipantListFetchedAt() {
   return useState<number | null>('participant-list-fetched-at', () => null)
 }
 
-export async function usePolledParticipantList() {
+// not async: lifecycle hooks registered after an await inside a composable lose their component and are silently
+// dropped, so the auto refresh has to be set up before the caller awaits the request
+export function usePolledParticipantList() {
   const fetchedAt = useParticipantListFetchedAt()
-  const { data, refresh } = await useFetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants', {
-    key: PARTICIPANT_LIST_DATA_KEY,
-    onResponse() {
+  const participantListRequest = useAsyncData(PARTICIPANT_LIST_DATA_KEY, async (nuxtApp, { signal }) => {
+    const previousResponse = nuxtApp.payload.data[PARTICIPANT_LIST_DATA_KEY] as DataWithFreshness<ParticipantListItemDto[]> | undefined
+    try {
+      const response = await $fetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants', { signal })
       fetchedAt.value = Date.now()
+      return response
+    } catch (error) {
+      // Nuxt empties the data when a refresh fails (e.g. while the server restarts), which would blank the list until the
+      // next successful poll; the freshness note still shows how old the kept list is
+      if (previousResponse && !signal.aborted) return previousResponse
+      throw error
     }
   })
-  useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
+  useAutoRefresh(participantListRequest.refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 
-  return data
+  return participantListRequest
 }
 
 export function useRecentParticipantList() {

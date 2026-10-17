@@ -34,9 +34,7 @@ const twitchLiveStreamsCacheOptions = {
   name: 'twitch-live-streams',
   getKey: () => 'all',
   maxAge: useRuntimeConfig().twitchLiveStatusCacheTtlSeconds,
-  // serving the expired value once more while refreshing would add another polling interval to how long a stream that
-  // just ended still shows as live
-  swr: false
+  ...FRESH_DATA_CACHE_OPTIONS
 }
 
 export const getLiveTwitchStreamsByLogin = defineCachedFunction(async (): Promise<TimestampedValue<Record<string, TwitchLiveStream>>> => {

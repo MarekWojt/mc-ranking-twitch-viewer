@@ -185,7 +185,8 @@ function toValidatedParticipants(entries: ResolvedParticipantConfigEntry[]): Par
 const participantsConfigCacheOptions = {
   name: 'participants-config',
   getKey: () => 'all',
-  maxAge: 60
+  maxAge: 60,
+  ...FRESH_DATA_CACHE_OPTIONS
 }
 
 export const loadParticipants = defineCachedFunction(async (): Promise<TimestampedValue<Participant[]>> => {

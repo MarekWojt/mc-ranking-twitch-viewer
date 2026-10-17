@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
-const response = await usePolledParticipantList()
+const { data: response } = await usePolledParticipantList()
 
 const participants = computed(() => response.value?.payload ?? [])
 const dataAsOf = computed(() => response.value?.asOf ?? null)

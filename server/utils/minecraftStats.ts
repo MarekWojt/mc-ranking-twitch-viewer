@@ -43,7 +43,8 @@ async function readPlayerStats(minecraftUuid: string): Promise<RawStatisticsByCa
 const minecraftStatsCacheOptions = {
   name: 'minecraft-player-stats',
   getKey: () => 'all',
-  maxAge: useRuntimeConfig().minecraftStatsCacheTtlSeconds
+  maxAge: useRuntimeConfig().minecraftStatsCacheTtlSeconds,
+  ...FRESH_DATA_CACHE_OPTIONS
 }
 
 export const loadAllPlayerStats = defineCachedFunction(async (): Promise<TimestampedValue<Record<string, RawStatisticsByCategory>>> => {

@@ -12,7 +12,8 @@ async function readFileIfExists(filePath: string): Promise<string | null> {
 const onlineStatusCacheOptions = {
   name: 'minecraft-online-players',
   getKey: () => 'all',
-  maxAge: useRuntimeConfig().minecraftOnlineStatusCacheTtlSeconds
+  maxAge: useRuntimeConfig().minecraftOnlineStatusCacheTtlSeconds,
+  ...FRESH_DATA_CACHE_OPTIONS
 }
 
 export const getOnlinePlayerUuids = defineCachedFunction(async (): Promise<TimestampedValue<string[]>> => {
