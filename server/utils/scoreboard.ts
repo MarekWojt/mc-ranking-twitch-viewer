@@ -79,7 +79,7 @@ export async function computeScoreboard(): Promise<Scoreboard> {
   const onlinePlayerUuidSet = new Set(onlinePlayerUuids)
   const statisticDefinitions = collectStatisticDefinitions(statsByMinecraftUuid, { en: vanillaDisplayNamesEn, de: vanillaDisplayNamesDe })
 
-  buildMinecraftIconBundle(statisticDefinitions, advancementScoreboard.advancements.map(scoredAdvancement => scoredAdvancement.definition)).catch((error) => {
+  getMinecraftIconBundle(statisticDefinitions, advancementScoreboard.advancements.map(scoredAdvancement => scoredAdvancement.definition)).catch((error) => {
     console.error('Vorab-Laden der Minecraft-Icons im Hintergrund fehlgeschlagen:', error)
   })
 
