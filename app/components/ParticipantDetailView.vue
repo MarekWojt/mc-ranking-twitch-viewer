@@ -58,7 +58,7 @@ interface PivotedParticipantRow {
 const route = useRoute()
 const participantId = route.params.id as string
 
-const { data: response, refresh } = await useFetch<ScoredDataWithFreshness<ParticipantDetailDto>>(`/api/participants/${participantId}`)
+const { data: response, refresh } = await useApiFetch<ScoredDataWithFreshness<ParticipantDetailDto>>(`/api/participants/${participantId}`)
 
 if (!response.value) {
   throw createError({ statusCode: 404, statusMessage: 'Teilnehmer nicht gefunden' })
@@ -69,7 +69,7 @@ useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 const participant = computed(() => response.value?.payload ?? null)
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
-const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+const { data: iconBundle } = await useApiFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
 
 const scoreGroupFactors = computed(() => response.value?.scoreGroupFactors ?? null)
 

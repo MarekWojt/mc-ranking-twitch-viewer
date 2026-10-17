@@ -8,10 +8,11 @@ function useParticipantListFetchedAt() {
 // dropped, so the auto refresh has to be set up before the caller awaits the request
 export function usePolledParticipantList() {
   const fetchedAt = useParticipantListFetchedAt()
+  const apiCacheBustingQuery = useApiCacheBustingQuery()
   const participantListRequest = useAsyncData(PARTICIPANT_LIST_DATA_KEY, async (nuxtApp, { signal }) => {
     const previousResponse = nuxtApp.payload.data[PARTICIPANT_LIST_DATA_KEY] as DataWithFreshness<ParticipantListItemDto[]> | undefined
     try {
-      const response = await $fetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants', { signal })
+      const response = await $fetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants', { signal, query: apiCacheBustingQuery })
       fetchedAt.value = Date.now()
       return response
     } catch (error) {
@@ -29,6 +30,7 @@ export function usePolledParticipantList() {
 export function useRecentParticipantList() {
   const { data } = useNuxtData<DataWithFreshness<ParticipantListItemDto[]>>(PARTICIPANT_LIST_DATA_KEY)
   const fetchedAt = useParticipantListFetchedAt()
+  const apiCacheBustingQuery = useApiCacheBustingQuery()
   const isLoading = ref(false)
 
   const participants = computed(() => data.value?.payload ?? [])
@@ -43,7 +45,7 @@ export function useRecentParticipantList() {
 
     isLoading.value = true
     try {
-      data.value = await $fetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants')
+      data.value = await $fetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants', { query: apiCacheBustingQuery })
       fetchedAt.value = Date.now()
     } finally {
       isLoading.value = false

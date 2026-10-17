@@ -4,7 +4,7 @@ import type { TableColumn } from '@nuxt/ui'
 const route = useRoute()
 const statisticSlug = route.params.slug as string
 
-const { data: response, refresh } = await useFetch<DataWithFreshness<StatisticDetailDto>>(`/api/statistics/${statisticSlug}`)
+const { data: response, refresh } = await useApiFetch<DataWithFreshness<StatisticDetailDto>>(`/api/statistics/${statisticSlug}`)
 
 if (!response.value) {
   throw createError({ statusCode: 404, statusMessage: 'Statistik nicht gefunden' })

@@ -78,13 +78,13 @@ const activeStatisticTab = computed({
   set: (newTab: string) => navigateTo({ path: `/statistiken/${newTab}`, query: currentQueryOverrides() })
 })
 
-const { data: response, refresh } = await useFetch<ScoredDataWithFreshness<StatisticListItemDto[]>>('/api/statistics')
+const { data: response, refresh } = await useApiFetch<ScoredDataWithFreshness<StatisticListItemDto[]>>('/api/statistics')
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 
-const { data: advancementsResponse, refresh: refreshAdvancements } = await useFetch<ScoredDataWithFreshness<AdvancementListItemDto[]>>('/api/advancements')
+const { data: advancementsResponse, refresh: refreshAdvancements } = await useApiFetch<ScoredDataWithFreshness<AdvancementListItemDto[]>>('/api/advancements')
 useAutoRefresh(refreshAdvancements, DATA_POLLING_INTERVAL_MILLISECONDS)
 
-const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+const { data: iconBundle } = await useApiFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
 
 const scoreGroupFactors = computed(() => response.value?.scoreGroupFactors ?? null)
 

@@ -30,7 +30,10 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
-    '/statistiken': { redirect: '/statistiken/allgemein' }
+    '/statistiken': { redirect: '/statistiken/allgemein' },
+    // the production proxy appends a 14-day cache header to every non-HTML response, which made browsers answer the
+    // polling and back navigation from days-old copies; no-store wins over it, routes with own caching override this
+    '/api/**': { headers: { 'cache-control': 'no-store' } }
   },
 
   compatibilityDate: '2026-06-30',

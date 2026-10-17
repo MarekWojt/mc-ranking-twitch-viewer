@@ -27,7 +27,7 @@ interface ResolvedObjectStatisticDetail {
   participants: ResolvedObjectStatisticParticipantRow[]
 }
 
-const { data: response, refresh } = await useFetch<ScoredDataWithFreshness<ObjectStatisticDetailDto>>(
+const { data: response, refresh } = await useApiFetch<ScoredDataWithFreshness<ObjectStatisticDetailDto>>(
   () => `/api/statistics/${props.kind}/${props.bareKey}`
 )
 
@@ -58,7 +58,7 @@ const detail = computed<ResolvedObjectStatisticDetail | null>(() => {
 
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
-const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+const { data: iconBundle } = await useApiFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
 
 const scoreGroupFactors = computed(() => response.value?.scoreGroupFactors ?? null)
 

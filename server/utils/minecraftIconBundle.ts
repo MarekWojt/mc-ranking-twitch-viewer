@@ -69,7 +69,12 @@ function buildAndStoreIconBundleOnce(contents: MinecraftIconBundleContents, cont
 
 // building the bundle queries the Minecraft wiki at a rate-limited pace and takes over a minute, so pages never wait for
 // it: they get the stored bundle (or an empty one on the very first start) while a new one is built in the background
-export async function getMinecraftIconBundle(statisticDefinitions: StatisticDefinition[], advancementDefinitions: AdvancementDefinition[]): Promise<MinecraftIconBundleDto> {
+export interface VersionedMinecraftIconBundle {
+  bundle: MinecraftIconBundleDto
+  version: string
+}
+
+export async function getMinecraftIconBundle(statisticDefinitions: StatisticDefinition[], advancementDefinitions: AdvancementDefinition[]): Promise<VersionedMinecraftIconBundle> {
   const contents = collectIconBundleContents(statisticDefinitions, advancementDefinitions)
   const contentKey = buildContentKey(contents)
   const storedBundle = await loadStoredIconBundle()
@@ -83,5 +88,7 @@ export async function getMinecraftIconBundle(statisticDefinitions: StatisticDefi
     })
   }
 
-  return storedBundle?.bundle ?? EMPTY_MINECRAFT_ICON_BUNDLE
+  return storedBundle
+    ? { bundle: storedBundle.bundle, version: `${storedBundle.contentKey.slice(0, 16)}-${storedBundle.builtAt}` }
+    : { bundle: EMPTY_MINECRAFT_ICON_BUNDLE, version: 'empty' }
 }

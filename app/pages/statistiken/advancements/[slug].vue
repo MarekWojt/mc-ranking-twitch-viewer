@@ -4,7 +4,7 @@ import type { TableColumn } from '@nuxt/ui'
 const route = useRoute()
 const advancementSlug = route.params.slug as string
 
-const { data: response, refresh } = await useFetch<DataWithFreshness<AdvancementDetailDto>>(`/api/advancements/${advancementSlug}`)
+const { data: response, refresh } = await useApiFetch<DataWithFreshness<AdvancementDetailDto>>(`/api/advancements/${advancementSlug}`)
 
 if (!response.value) {
   throw createError({ statusCode: 404, statusMessage: 'Advancement nicht gefunden' })
@@ -29,7 +29,7 @@ const advancement = computed(() => {
 })
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
-const { data: iconBundle } = await useFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+const { data: iconBundle } = await useApiFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
 
 const advancementIconSrc = computed(() => iconBundle.value?.advancementIconsBySlug[advancementSlug] ?? null)
 
