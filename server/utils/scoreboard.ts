@@ -67,12 +67,12 @@ export async function computeScoreboard(): Promise<Scoreboard> {
   const onlinePlayerUuids = onlineStatusResult.value
   const liveStreamsByTwitchLogin = liveStreamsResult.value
   const profileImageUrlByTwitchLogin = profileImageUrlsResult.value
+  // profile pictures are left out: they are cached for an hour and say nothing about how current the shown values are
   const asOf = toOldestFetchedAt([
     participantsResult.fetchedAt,
     statsResult.fetchedAt,
     onlineStatusResult.fetchedAt,
     liveStreamsResult.fetchedAt,
-    profileImageUrlsResult.fetchedAt,
     advancementScoreboard.asOf
   ])
 
