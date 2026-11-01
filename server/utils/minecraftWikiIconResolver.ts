@@ -185,6 +185,7 @@ async function queryWikiImageUrlsForBatch(fileNames: string[], remainingRetries:
   try {
     response = await $fetch<WikiQueryResponse>(MINECRAFT_WIKI_API_URL, {
       headers: { 'User-Agent': MINECRAFT_WIKI_USER_AGENT },
+      timeout: EXTERNAL_REQUEST_TIMEOUT_MILLISECONDS,
       query: {
         action: 'query',
         titles: fileNames.map(fileName => `File:${fileName}`).join('|'),
@@ -243,6 +244,7 @@ async function queryWikiPageImageUrlsForBatch(pageTitles: string[], remainingRet
   try {
     response = await $fetch<WikiPageImageQueryResponse>(MINECRAFT_WIKI_API_URL, {
       headers: { 'User-Agent': MINECRAFT_WIKI_USER_AGENT },
+      timeout: EXTERNAL_REQUEST_TIMEOUT_MILLISECONDS,
       query: {
         action: 'query',
         titles: pageTitles.join('|'),

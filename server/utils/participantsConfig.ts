@@ -59,62 +59,63 @@ function describeParticipantConfigEntryForErrors(entry: ParticipantConfigEntry, 
   return entry.displayName ?? entry.minecraftName ?? entry.twitchLogin ?? entry.minecraftUuid ?? `Eintrag Nr. ${entryIndex + 1}`
 }
 
-async function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entryIndex: number): Promise<ParticipantConfigFieldCompletion & { entry: ResolvedParticipantConfigEntry }> {
+function takeLookedUpValueOrThrow<Value>(lookup: CachedValueLookup<Value>, lookedUpValueDescription: string): Value {
+  if (lookup.status === 'stored') return lookup.value
+  if (lookup.status === 'loading') throw new Error(`${lookedUpValueDescription} wird gerade im Hintergrund nachgeschlagen`)
+  throw new Error(`${lookedUpValueDescription} konnte nicht ermittelt werden, wird in einigen Minuten erneut versucht`, { cause: lookup.error })
+}
+
+// never waits for Mojang or Twitch: values that are not known yet are looked up in the background and the entry is skipped until
+// then, so a slow lookup or a misspelled name in participants.toml cannot hold up every page
+function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entryIndex: number): ParticipantConfigFieldCompletion & { entry: ResolvedParticipantConfigEntry } {
   const resolvedEntry: ParticipantConfigEntry = { ...entry }
+  const entryDescription = describeParticipantConfigEntryForErrors(entry, entryIndex)
   const wasIdDerived = !resolvedEntry.id
   const wasDisplayNameDerived = !resolvedEntry.displayName
   const wasMinecraftUuidDerived = !resolvedEntry.minecraftUuid
   let wasMinecraftNameDerived = false
+  // started before the Minecraft lookups below can skip the entry, so both run in the same round instead of one after the other
+  const twitchDisplayNameLookup = wasDisplayNameDerived && resolvedEntry.twitchLogin
+    ? lookUpTwitchDisplayNameWithoutWaiting(resolvedEntry.twitchLogin)
+    : null
 
   if (wasDisplayNameDerived && !resolvedEntry.minecraftName && !resolvedEntry.twitchLogin) {
     if (!resolvedEntry.minecraftUuid) {
-      throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: weder displayName, minecraftName, twitchLogin noch minecraftUuid in participants.toml angegeben`)
+      throw new Error(`${entryDescription}: weder displayName, minecraftName, twitchLogin noch minecraftUuid in participants.toml angegeben`)
     }
 
-    try {
-      resolvedEntry.minecraftName = await resolveMinecraftNameFromUuid(resolvedEntry.minecraftUuid)
-    } catch (error) {
-      throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: minecraftName konnte nicht aus minecraftUuid "${resolvedEntry.minecraftUuid}" ermittelt werden`, { cause: error })
-    }
+    resolvedEntry.minecraftName = takeLookedUpValueOrThrow(
+      lookUpCurrentMinecraftNameWithoutWaiting(resolvedEntry.minecraftUuid, { isUrgent: true }),
+      `${entryDescription}: minecraftName zur minecraftUuid "${resolvedEntry.minecraftUuid}"`
+    )
     wasMinecraftNameDerived = true
   }
 
   if (wasMinecraftUuidDerived) {
     if (!resolvedEntry.minecraftName) {
-      throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: weder minecraftUuid noch minecraftName in participants.toml angegeben`)
+      throw new Error(`${entryDescription}: weder minecraftUuid noch minecraftName in participants.toml angegeben`)
     }
 
-    try {
-      resolvedEntry.minecraftUuid = await resolveMinecraftUuidFromName(resolvedEntry.minecraftName)
-    } catch (error) {
-      throw new Error(`${describeParticipantConfigEntryForErrors(entry, entryIndex)}: minecraftUuid konnte nicht aus minecraftName "${resolvedEntry.minecraftName}" ermittelt werden`, { cause: error })
-    }
+    resolvedEntry.minecraftUuid = takeLookedUpValueOrThrow(
+      lookUpMinecraftUuidByNameWithoutWaiting(resolvedEntry.minecraftName),
+      `${entryDescription}: minecraftUuid zum minecraftName "${resolvedEntry.minecraftName}"`
+    )
   }
 
   if (resolvedEntry.minecraftName && resolvedEntry.minecraftUuid && !wasMinecraftNameDerived) {
-    const canonicalMinecraftName = getLastConfirmedMinecraftNameWhileConfirmingInBackground(resolvedEntry.minecraftUuid, (error) => {
-      console.error(
-        `${describeParticipantConfigEntryForErrors(entry, entryIndex)}: aktuelle Schreibweise von minecraftName konnte nicht über Mojang bestätigt werden, bisheriger Wert bleibt bestehen`,
-        error
-      )
-    })
-    if (canonicalMinecraftName && canonicalMinecraftName !== resolvedEntry.minecraftName) {
-      resolvedEntry.minecraftName = canonicalMinecraftName
+    const currentMinecraftNameLookup = lookUpCurrentMinecraftNameWithoutWaiting(resolvedEntry.minecraftUuid)
+    if (currentMinecraftNameLookup.status === 'stored' && currentMinecraftNameLookup.value !== resolvedEntry.minecraftName) {
+      resolvedEntry.minecraftName = currentMinecraftNameLookup.value
       wasMinecraftNameDerived = true
     }
   }
 
   if (wasDisplayNameDerived) {
-    if (resolvedEntry.twitchLogin) {
-      try {
-        resolvedEntry.displayName = await resolveTwitchDisplayNameFromLogin(resolvedEntry.twitchLogin)
-      } catch (error) {
-        console.error(
-          `${describeParticipantConfigEntryForErrors(entry, entryIndex)}: Schreibweise des Twitch-Namens konnte nicht über Twitch bestätigt werden, verwende twitchLogin unverändert als displayName`,
-          error
-        )
-        resolvedEntry.displayName = resolvedEntry.twitchLogin
+    if (twitchDisplayNameLookup) {
+      if (twitchDisplayNameLookup.status === 'loading') {
+        throw new Error(`${entryDescription}: Schreibweise des Twitch-Namens wird gerade im Hintergrund nachgeschlagen`)
       }
+      resolvedEntry.displayName = twitchDisplayNameLookup.status === 'stored' ? twitchDisplayNameLookup.value : resolvedEntry.twitchLogin!
     } else {
       resolvedEntry.displayName = resolvedEntry.minecraftName
     }
@@ -127,23 +128,18 @@ async function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entr
   return { entry: resolvedEntry as ResolvedParticipantConfigEntry, wasIdDerived, wasDisplayNameDerived, wasMinecraftUuidDerived, wasMinecraftNameDerived }
 }
 
-async function resolveParticipantConfigEntriesTolerantly(rawEntries: ParticipantConfigEntry[]): Promise<ParticipantConfigEntryResolution[]> {
-  const entryResolutions: ParticipantConfigEntryResolution[] = []
-
-  for (const [entryIndex, rawEntry] of rawEntries.entries()) {
+function resolveParticipantConfigEntriesTolerantly(rawEntries: ParticipantConfigEntry[]): ParticipantConfigEntryResolution[] {
+  return rawEntries.map((rawEntry, entryIndex) => {
     try {
-      const completion = await resolveParticipantConfigEntry(rawEntry, entryIndex)
-      entryResolutions.push({ rawEntry, completion })
+      return { rawEntry, completion: resolveParticipantConfigEntry(rawEntry, entryIndex) }
     } catch (error) {
       console.error(
         `Teilnehmer-Eintrag konnte nicht aufgelöst werden und wird vorerst übersprungen: ${describeParticipantConfigEntryForErrors(rawEntry, entryIndex)}`,
         error
       )
-      entryResolutions.push({ rawEntry, completion: null })
+      return { rawEntry, completion: null }
     }
-  }
-
-  return entryResolutions
+  })
 }
 
 async function discoverParticipantConfigEntriesFromStats(alreadyClaimedMinecraftUuids: Set<string>): Promise<ParticipantConfigEntryResolution[]> {
@@ -198,7 +194,7 @@ export const loadParticipants = defineCachedFunction(async (): Promise<Timestamp
     console.log('Auto-Discovery neuer Teilnehmer aus den Stats ist deaktiviert (autoAddFromStats = false in participants.toml)')
   }
 
-  const configuredEntryResolutions = await resolveParticipantConfigEntriesTolerantly(rawEntries)
+  const configuredEntryResolutions = resolveParticipantConfigEntriesTolerantly(rawEntries)
   const configuredCompletions = configuredEntryResolutions
     .map(resolution => resolution.completion)
     .filter(completion => completion !== null)

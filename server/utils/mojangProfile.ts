@@ -32,11 +32,32 @@ interface MojangSessionProfile {
 
 const mojangApiRequestQueue = createConcurrencyLimitedQueue(1, 650)
 
-export async function resolveMinecraftUuidFromName(minecraftName: string): Promise<string> {
-  const profile = await mojangApiRequestQueue(() => $fetch<MojangNameLookupResponse>(
-    `https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(minecraftName)}`
-  ))
-  return normalizeMinecraftUuid(profile.id)
+function enqueueMojangRequest<T>(request: () => Promise<T>, { isUrgent }: CachedValueLoadContext): Promise<T> {
+  return mojangApiRequestQueue(request, { isBackgroundTask: !isUrgent })
+}
+
+async function fetchMinecraftUuidByName(minecraftName: string, loadContext: CachedValueLoadContext): Promise<string> {
+  try {
+    const profile = await enqueueMojangRequest(() => $fetch<MojangNameLookupResponse>(
+      `https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(minecraftName)}`,
+      { timeout: EXTERNAL_REQUEST_TIMEOUT_MILLISECONDS }
+    ), loadContext)
+    return normalizeMinecraftUuid(profile.id)
+  } catch (error) {
+    if (isNotFoundFetchError(error)) throw new Error(`Mojang kennt keinen Minecraft-Account mit dem Namen "${minecraftName}"`, { cause: error })
+    throw error
+  }
+}
+
+const minecraftUuidByNameCache = createBackgroundRefreshedCache<string>({
+  describeValue: minecraftName => `Minecraft-UUID zum Namen "${minecraftName}"`,
+  load: fetchMinecraftUuidByName,
+  // a found UUID is written into participants.toml, so it is never looked up again
+  refreshIntervalMilliseconds: Number.POSITIVE_INFINITY
+})
+
+export function lookUpMinecraftUuidByNameWithoutWaiting(minecraftName: string): CachedValueLookup<string> {
+  return minecraftUuidByNameCache.lookUpWithoutWaiting(minecraftName.toLowerCase(), { isUrgent: true })
 }
 
 function parseMinecraftSkinInfo(properties: MojangProfileProperty[]): MinecraftSkinInfo | null {
@@ -50,38 +71,26 @@ function parseMinecraftSkinInfo(properties: MojangProfileProperty[]): MinecraftS
   return { skinTextureUrl: skinTexture.url, isSlimModel: skinTexture.metadata?.model === 'slim' }
 }
 
-async function fetchMojangSessionProfile(minecraftUuid: string): Promise<MojangSessionProfile> {
-  const undashedMinecraftUuid = minecraftUuid.replaceAll('-', '')
-  const profile = await mojangApiRequestQueue(() => $fetch<MojangSessionProfileResponse>(
-    `https://sessionserver.mojang.com/session/minecraft/profile/${undashedMinecraftUuid}`
-  ))
+async function fetchMojangSessionProfile(minecraftUuid: string, loadContext: CachedValueLoadContext): Promise<MojangSessionProfile> {
+  const profile = await enqueueMojangRequest(() => $fetch<MojangSessionProfileResponse>(
+    `https://sessionserver.mojang.com/session/minecraft/profile/${minecraftUuid.replaceAll('-', '')}`,
+    { timeout: EXTERNAL_REQUEST_TIMEOUT_MILLISECONDS }
+  ), loadContext)
   return { name: profile.name, skin: parseMinecraftSkinInfo(profile.properties) }
 }
 
-const mojangSessionProfileCacheOptions = {
-  name: 'mojang-session-profile',
-  getKey: (minecraftUuid: string) => minecraftUuid,
-  // also decides how soon a changed skin shows up; renders are only redone when the skin texture actually differs
-  maxAge: 60 * 60
-}
+const mojangSessionProfileCache = createBackgroundRefreshedCache<MojangSessionProfile>({
+  describeValue: minecraftUuid => `Mojang-Profil von ${minecraftUuid}`,
+  load: fetchMojangSessionProfile,
+  // also decides how soon a changed name or skin shows up; renders are only redone when the skin texture actually differs
+  refreshIntervalMilliseconds: 60 * 60 * 1000
+})
 
-const resolveMojangSessionProfile = defineCachedFunction(fetchMojangSessionProfile, mojangSessionProfileCacheOptions)
-
-const lastConfirmedMinecraftNamesByUuid = new Map<string, string>()
-
-export async function resolveMinecraftNameFromUuid(minecraftUuid: string): Promise<string> {
-  const minecraftName = (await resolveMojangSessionProfile(minecraftUuid)).name
-  lastConfirmedMinecraftNamesByUuid.set(minecraftUuid, minecraftName)
-  return minecraftName
-}
-
-// confirming every configured name takes about 40 s after a server start because of Mojang's rate limit, so callers
-// that already have a usable name get the last confirmed spelling right away while the confirmation runs in the background
-export function getLastConfirmedMinecraftNameWhileConfirmingInBackground(minecraftUuid: string, onConfirmationError: (error: unknown) => void): string | undefined {
-  resolveMinecraftNameFromUuid(minecraftUuid).catch(onConfirmationError)
-  return lastConfirmedMinecraftNamesByUuid.get(minecraftUuid)
+export function lookUpCurrentMinecraftNameWithoutWaiting(minecraftUuid: string, lookUpOptions: LookUpWithoutWaitingOptions = {}): CachedValueLookup<string> {
+  const profileLookup = mojangSessionProfileCache.lookUpWithoutWaiting(minecraftUuid, lookUpOptions)
+  return profileLookup.status === 'stored' ? { status: 'stored', value: profileLookup.value.name } : profileLookup
 }
 
 export async function resolveMinecraftSkinInfo(minecraftUuid: string): Promise<MinecraftSkinInfo | null> {
-  return (await resolveMojangSessionProfile(minecraftUuid)).skin
+  return (await mojangSessionProfileCache.getStoredValueOrWaitForFirstLoad(minecraftUuid)).skin
 }

@@ -84,7 +84,7 @@ useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 const { data: advancementsResponse, refresh: refreshAdvancements } = await useApiFetch<ScoredDataWithFreshness<AdvancementListItemDto[]>>('/api/advancements')
 useAutoRefresh(refreshAdvancements, DATA_POLLING_INTERVAL_MILLISECONDS)
 
-const { data: iconBundle } = await useApiFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+const { data: iconBundle } = await useMinecraftIconBundle()
 
 const scoreGroupFactors = computed(() => response.value?.scoreGroupFactors ?? null)
 

@@ -8,6 +8,15 @@ export function splitIntoBatches<T>(items: T[], batchSize: number): T[][] {
   return batches
 }
 
+export async function loadSortedParticipantTwitchLogins(): Promise<string[]> {
+  const { value: participants } = await loadParticipants()
+  return [...new Set(
+    participants
+      .map(participant => participant.twitchLogin)
+      .filter((twitchLogin): twitchLogin is string => twitchLogin !== null)
+  )].sort()
+}
+
 function isUnauthorizedFetchError(error: unknown): boolean {
   return (error as { response?: { status?: number } })?.response?.status === 401
     || (error as { statusCode?: number })?.statusCode === 401

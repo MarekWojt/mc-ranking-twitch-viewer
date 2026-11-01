@@ -25,29 +25,15 @@ async function fetchLiveStreamsBatch(twitchLogins: string[]): Promise<TwitchGetS
     headers: {
       'Client-Id': twitchClientId,
       'Authorization': `Bearer ${accessToken}`
-    }
+    },
+    timeout: EXTERNAL_REQUEST_TIMEOUT_MILLISECONDS
   }))
   return response.data
 }
 
-const twitchLiveStreamsCacheOptions = {
-  name: 'twitch-live-streams',
-  getKey: () => 'all',
-  maxAge: useRuntimeConfig().twitchLiveStatusCacheTtlSeconds,
-  ...FRESH_DATA_CACHE_OPTIONS
-}
-
-export const getLiveTwitchStreamsByLogin = defineCachedFunction(async (): Promise<TimestampedValue<Record<string, TwitchLiveStream>>> => {
-  const { value: participants } = await loadParticipants()
-  const twitchLogins = [...new Set(
-    participants
-      .map(participant => participant.twitchLogin)
-      .filter((twitchLogin): twitchLogin is string => twitchLogin !== null)
-  )]
-  if (twitchLogins.length === 0) return { value: {}, fetchedAt: new Date().toISOString() }
-
-  const batches = splitIntoBatches(twitchLogins, TWITCH_HELIX_LOGIN_BATCH_SIZE)
-  const batchResults = await Promise.all(batches.map(fetchLiveStreamsBatch))
+async function fetchLiveStreamsOfParticipants(): Promise<TimestampedValue<Record<string, TwitchLiveStream>>> {
+  const twitchLogins = await loadSortedParticipantTwitchLogins()
+  const batchResults = await Promise.all(splitIntoBatches(twitchLogins, TWITCH_HELIX_LOGIN_BATCH_SIZE).map(fetchLiveStreamsBatch))
 
   const liveStreamsByTwitchLogin = Object.fromEntries(batchResults.flat().map(entry => [
     entry.user_login.toLowerCase(),
@@ -60,4 +46,14 @@ export const getLiveTwitchStreamsByLogin = defineCachedFunction(async (): Promis
     } satisfies TwitchLiveStream
   ]))
   return { value: liveStreamsByTwitchLogin, fetchedAt: new Date().toISOString() }
-}, twitchLiveStreamsCacheOptions)
+}
+
+const liveTwitchStreamsCache = createBackgroundRefreshedCache<TimestampedValue<Record<string, TwitchLiveStream>>>({
+  describeValue: () => 'Twitch-Live-Status',
+  load: fetchLiveStreamsOfParticipants,
+  refreshIntervalMilliseconds: useRuntimeConfig().twitchLiveStatusCacheTtlSeconds * 1000
+})
+
+export function getLiveTwitchStreamsByLogin(): Promise<TimestampedValue<Record<string, TwitchLiveStream>>> {
+  return liveTwitchStreamsCache.getStoredValueOrWaitForFirstLoad('all')
+}

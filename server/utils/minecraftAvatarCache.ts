@@ -28,7 +28,8 @@ async function downloadSkinTextureBytes(skinTextureUrl: string): Promise<Buffer>
 
   const arrayBuffer = await $fetch<ArrayBuffer>(skinTextureUrl, {
     responseType: 'arrayBuffer',
-    headers: { 'User-Agent': MOJANG_TEXTURE_USER_AGENT }
+    headers: { 'User-Agent': MOJANG_TEXTURE_USER_AGENT },
+    timeout: EXTERNAL_REQUEST_TIMEOUT_MILLISECONDS
   })
   const bytes = Buffer.from(arrayBuffer)
 

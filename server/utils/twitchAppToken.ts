@@ -12,7 +12,8 @@ export async function fetchFreshTwitchAppAccessToken(): Promise<string> {
       client_id: twitchClientId,
       client_secret: twitchClientSecret,
       grant_type: 'client_credentials'
-    }
+    },
+    timeout: EXTERNAL_REQUEST_TIMEOUT_MILLISECONDS
   })
   return response.access_token
 }

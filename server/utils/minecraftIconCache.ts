@@ -11,11 +11,6 @@ type MinecraftIconDownloadResult
     | { outcome: 'confirmedMissing' }
     | { outcome: 'temporarilyUnavailable' }
 
-function isNotFoundFetchError(error: unknown): boolean {
-  return (error as { response?: { status?: number } })?.response?.status === 404
-    || (error as { statusCode?: number })?.statusCode === 404
-}
-
 async function readFileIfExists(filePath: string): Promise<Buffer | null> {
   try {
     return await readFile(filePath)
@@ -29,7 +24,8 @@ async function downloadIconFromUrl(sourceUrl: string): Promise<MinecraftIconDown
   try {
     const arrayBuffer = await $fetch<ArrayBuffer>(sourceUrl, {
       responseType: 'arrayBuffer',
-      headers: { 'User-Agent': MINECRAFT_WIKI_USER_AGENT }
+      headers: { 'User-Agent': MINECRAFT_WIKI_USER_AGENT },
+      timeout: EXTERNAL_REQUEST_TIMEOUT_MILLISECONDS
     })
     return { outcome: 'found', bytes: Buffer.from(arrayBuffer) }
   } catch (error) {

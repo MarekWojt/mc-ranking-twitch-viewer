@@ -7,6 +7,9 @@ const MINECRAFT_AVATAR_RENDER_DIRECTORY = resolve(process.cwd(), '.data/minecraf
 // renders are stored by skin content and reused forever, so a change to the renderer's output needs a new version
 const MINECRAFT_AVATAR_RENDERER_VERSION = 1
 const MINECRAFT_AVATAR_RENDER_KINDS: MinecraftAvatarRenderKind[] = ['body', 'head', 'avatar']
+// a player seen for the first time has no previous skin to show; their Mojang lookup can sit behind the queue for minutes after
+// a restart, so the image is answered as missing instead of holding the connection, and the render is ready for a later view
+const FIRST_SKIN_MAX_WAIT_MILLISECONDS = 5000
 
 interface MinecraftSkinRecord {
   skinTextureUrl: string
@@ -128,7 +131,8 @@ export async function getMinecraftAvatarRender(minecraftUuid: string, kind: Mine
       console.error(`Skin von ${minecraftUuid} konnte nicht aktualisiert werden, der bisherige bleibt bestehen:`, error)
     })
   } else {
-    skinRecord = await skinRefresh
+    const answerAsMissing = new Promise<null>(resolve => setTimeout(() => resolve(null), FIRST_SKIN_MAX_WAIT_MILLISECONDS))
+    skinRecord = await Promise.race([skinRefresh, answerAsMissing])
   }
   if (!skinRecord) return null
 

@@ -58,7 +58,7 @@ const detail = computed<ResolvedObjectStatisticDetail | null>(() => {
 
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
-const { data: iconBundle } = await useApiFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+const { data: iconBundle } = await useMinecraftIconBundle()
 
 const scoreGroupFactors = computed(() => response.value?.scoreGroupFactors ?? null)
 

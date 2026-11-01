@@ -29,7 +29,7 @@ const advancement = computed(() => {
 })
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
-const { data: iconBundle } = await useApiFetch<MinecraftIconBundleDto>('/api/icons/minecraft-bundle')
+const { data: iconBundle } = await useMinecraftIconBundle()
 
 const advancementIconSrc = computed(() => iconBundle.value?.advancementIconsBySlug[advancementSlug] ?? null)
 
