@@ -1,6 +1,6 @@
 export default defineEventHandler(async (event): Promise<ScoredDataWithFreshness<ParticipantDetailDto>> => {
   const participantId = getRouterParam(event, 'id')
-  const scoreboard = await computeScoreboard()
+  const scoreboard = await getScoreboard()
   const scoredParticipant = scoreboard.participants.find(entry => entry.participant.id === participantId)
 
   if (!scoredParticipant) {

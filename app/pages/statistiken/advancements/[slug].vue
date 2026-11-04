@@ -29,7 +29,7 @@ const advancement = computed(() => {
 })
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
-const { data: iconBundle } = await useMinecraftIconBundle()
+const { iconBundle, isIconBundleLoading } = useMinecraftIconBundle()
 
 const advancementIconSrc = computed(() => iconBundle.value?.advancementIconsBySlug[advancementSlug] ?? null)
 
@@ -58,6 +58,7 @@ function openParticipantDetail(_event: Event, row: { original: AdvancementPartic
       <div class="flex items-center gap-3">
         <MinecraftObjectIcon
           :src="advancementIconSrc"
+          :is-loading="isIconBundleLoading"
           :alt="advancement.label"
           kind="item"
         />

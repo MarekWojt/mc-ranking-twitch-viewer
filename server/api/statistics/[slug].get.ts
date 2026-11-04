@@ -1,6 +1,6 @@
 export default defineEventHandler(async (event): Promise<DataWithFreshness<StatisticDetailDto>> => {
   const slug = getRouterParam(event, 'slug')
-  const scoreboard = await computeScoreboard()
+  const scoreboard = await getScoreboard()
   const statisticDefinition = scoreboard.statisticDefinitions.find(definition => definition.slug === slug)
 
   if (!statisticDefinition) {

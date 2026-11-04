@@ -7,7 +7,7 @@ export interface ScoredAdvancements {
 
 export async function loadScoredAdvancements(): Promise<ScoredAdvancements> {
   try {
-    const scoreboard = await computeScoreboard()
+    const scoreboard = await getScoreboard()
     return {
       asOf: scoreboard.asOf,
       advancements: scoreboard.advancements,

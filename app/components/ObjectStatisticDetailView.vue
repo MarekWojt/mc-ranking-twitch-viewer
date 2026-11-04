@@ -58,7 +58,7 @@ const detail = computed<ResolvedObjectStatisticDetail | null>(() => {
 
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
-const { data: iconBundle } = await useMinecraftIconBundle()
+const { iconBundle, isIconBundleLoading } = useMinecraftIconBundle()
 
 const scoreGroupFactors = computed(() => response.value?.scoreGroupFactors ?? null)
 
@@ -178,6 +178,7 @@ function openParticipantDetail(_event: Event, row: { original: ResolvedObjectSta
       <div class="flex items-center gap-3">
         <MinecraftObjectIcon
           :src="iconSrc"
+          :is-loading="isIconBundleLoading"
           :alt="detail.objectLabel"
           :kind="kind === 'items' ? 'item' : 'entity'"
         />

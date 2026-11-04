@@ -91,7 +91,11 @@ export interface StatisticDetailDto {
   weight: number
 }
 
-export interface MinecraftIconBundleDto {
+export interface MinecraftIconBundleVersionDto {
+  version: string
+}
+
+export interface MinecraftIconBundleDto extends MinecraftIconBundleVersionDto {
   itemIconsByBareId: Record<string, string>
   entityIconsByBareId: Record<string, string>
   advancementIconsBySlug: Record<string, string>

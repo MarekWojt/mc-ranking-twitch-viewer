@@ -44,8 +44,11 @@ function formatDistanceFromCentimeters(centimeters: number): string {
   return `${Math.round(meters)} m`
 }
 
+// toLocaleString builds a new formatter on every call, which cost around 30 ms per participant page with its thousands of values
+const GERMAN_NUMBER_FORMAT = new Intl.NumberFormat('de-DE')
+
 export function formatStatisticDisplayValue(statisticKey: string, rawValue: number): string {
   if (TICK_BASED_STATISTIC_KEYS.has(statisticKey)) return formatDurationFromTicks(rawValue)
   if (CENTIMETER_BASED_STATISTIC_KEYS.has(statisticKey)) return formatDistanceFromCentimeters(rawValue)
-  return rawValue.toLocaleString('de-DE')
+  return GERMAN_NUMBER_FORMAT.format(rawValue)
 }

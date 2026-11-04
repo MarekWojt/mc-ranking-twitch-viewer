@@ -69,7 +69,7 @@ useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 const participant = computed(() => response.value?.payload ?? null)
 const dataAsOf = computed(() => response.value?.asOf ?? null)
 
-const { data: iconBundle } = await useMinecraftIconBundle()
+const { iconBundle, isIconBundleLoading } = useMinecraftIconBundle()
 
 const scoreGroupFactors = computed(() => response.value?.scoreGroupFactors ?? null)
 
@@ -657,6 +657,7 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
               <MinecraftObjectIcon
                 v-else
                 :src="findItemIconSrc(row.original.objectKey)"
+                :is-loading="isIconBundleLoading"
                 :alt="row.original.objectLabel"
                 kind="item"
               />
@@ -690,6 +691,7 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
               <MinecraftObjectIcon
                 v-else
                 :src="findEntityIconSrc(row.original.objectKey)"
+                :is-loading="isIconBundleLoading"
                 :alt="row.original.objectLabel"
                 kind="entity"
               />
@@ -725,6 +727,7 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
               >
                 <MinecraftObjectIcon
                   :src="findAdvancementIconSrc(row.original.slug)"
+                  :is-loading="isIconBundleLoading"
                   :alt="row.original.label"
                   kind="item"
                 />

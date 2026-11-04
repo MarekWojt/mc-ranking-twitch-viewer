@@ -126,7 +126,9 @@ watch(isOpen, async (open) => {
     isRolling.value = false
     return
   }
-  participantRefreshIntervalId = setInterval(ensureRecentParticipants, DATA_POLLING_INTERVAL_MILLISECONDS)
+  participantRefreshIntervalId = setInterval(() => {
+    if (document.visibilityState === 'visible') ensureRecentParticipants()
+  }, DATA_POLLING_INTERVAL_MILLISECONDS)
   displayedParticipantId.value = null
   await rollRaidTargetFromRecentParticipants()
 })

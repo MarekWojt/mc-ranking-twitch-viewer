@@ -2,7 +2,7 @@ export async function buildObjectStatisticDetail(
   bareObjectKey: string,
   specificSubgroup: SpecificStatisticSubgroup
 ): Promise<ScoredDataWithFreshness<ObjectStatisticDetailDto> | null> {
-  const scoreboard = await computeScoreboard()
+  const scoreboard = await getScoreboard()
   const objectKey = toMinecraftId(bareObjectKey)
   const matchingDefinitions = scoreboard.statisticDefinitions.filter(
     definition => definition.key === objectKey && definition.specificSubgroup === specificSubgroup

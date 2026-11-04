@@ -60,6 +60,21 @@ async function resolveCachedIcon(cacheKey: string, sourceUrl: string): Promise<B
   return downloadResult.bytes
 }
 
+const WIKI_ICON_DIRECTORY_PATTERN = /^wiki-[a-z-]+$/
+const MINECRAFT_BARE_ID_PATTERN = /^[a-z0-9_]+$/
+const WIKI_ICON_FILE_EXTENSIONS = ['gif', 'png']
+
+// both values come straight from a public URL, so the patterns are what keeps a request inside the wiki icon directories
+export async function readStoredWikiIcon(iconDirectory: string, bareId: string): Promise<Buffer | null> {
+  if (!WIKI_ICON_DIRECTORY_PATTERN.test(iconDirectory) || !MINECRAFT_BARE_ID_PATTERN.test(bareId)) return null
+
+  for (const extension of WIKI_ICON_FILE_EXTENSIONS) {
+    const iconBytes = await readFileIfExists(join(MINECRAFT_ICON_CACHE_DIRECTORY, iconDirectory, `${bareId}.${extension}`))
+    if (iconBytes !== null) return iconBytes
+  }
+  return null
+}
+
 const inFlightCachedIconRequestsByCacheKey = new Map<string, Promise<Buffer | null>>()
 
 export function getOrDownloadCachedIcon(cacheKey: string, sourceUrl: string): Promise<Buffer | null> {

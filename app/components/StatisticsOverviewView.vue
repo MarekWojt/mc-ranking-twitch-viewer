@@ -84,7 +84,7 @@ useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
 const { data: advancementsResponse, refresh: refreshAdvancements } = await useApiFetch<ScoredDataWithFreshness<AdvancementListItemDto[]>>('/api/advancements')
 useAutoRefresh(refreshAdvancements, DATA_POLLING_INTERVAL_MILLISECONDS)
 
-const { data: iconBundle } = await useMinecraftIconBundle()
+const { iconBundle, isIconBundleLoading } = useMinecraftIconBundle()
 
 const scoreGroupFactors = computed(() => response.value?.scoreGroupFactors ?? null)
 
@@ -578,6 +578,7 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
               <MinecraftObjectIcon
                 v-else
                 :src="findItemIconSrc(row.original.objectKey)"
+                :is-loading="isIconBundleLoading"
                 :alt="row.original.objectLabel"
                 kind="item"
               />
@@ -611,6 +612,7 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
               <MinecraftObjectIcon
                 v-else
                 :src="findEntityIconSrc(row.original.objectKey)"
+                :is-loading="isIconBundleLoading"
                 :alt="row.original.objectLabel"
                 kind="entity"
               />
@@ -646,6 +648,7 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
               >
                 <MinecraftObjectIcon
                   :src="findAdvancementIconSrc(row.original.slug)"
+                  :is-loading="isIconBundleLoading"
                   :alt="row.original.label"
                   kind="item"
                 />

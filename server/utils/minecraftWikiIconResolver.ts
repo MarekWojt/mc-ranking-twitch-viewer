@@ -304,6 +304,13 @@ interface WikiIconCandidateGroup {
   candidateFileNames: string[]
 }
 
+// animated icons are over 80 % of all icon bytes although there are only a few dozen of them, so they stay out of the bundle
+// and browsers load each one separately once it is on screen
+function toBundledIconSrc(cacheKeyPrefix: string, bareId: string, extension: string, iconBytes: Buffer): string {
+  if (detectAnimatedIconContentType(iconBytes) !== null) return buildAnimatedIconUrl(cacheKeyPrefix, bareId, iconBytes)
+  return `data:image/${extension};base64,${iconBytes.toString('base64')}`
+}
+
 async function resolveWikiIconsForCandidateGroups(groups: WikiIconCandidateGroup[]): Promise<Record<string, string>> {
   const imageUrlByFileName = await queryWikiImageUrlsInBatches(groups.flatMap(group => group.candidateFileNames))
 
@@ -314,7 +321,7 @@ async function resolveWikiIconsForCandidateGroups(groups: WikiIconCandidateGroup
 
       const extension = new URL(imageUrl).pathname.toLowerCase().endsWith('.gif') ? 'gif' : 'png'
       const iconBytes = await getOrDownloadCachedIcon(`${group.cacheKeyPrefix}/${group.bareId}.${extension}`, imageUrl)
-      if (iconBytes !== null) return [group.bareId, `data:image/${extension};base64,${iconBytes.toString('base64')}`]
+      if (iconBytes !== null) return [group.bareId, toBundledIconSrc(group.cacheKeyPrefix, group.bareId, extension, iconBytes)]
     }
     return [group.bareId, null]
   }))
@@ -341,7 +348,7 @@ async function resolveEntityRenderIconsByBareId(bareIds: string[]): Promise<{ re
 
     const extension = new URL(imageUrl).pathname.toLowerCase().endsWith('.gif') ? 'gif' : 'png'
     const iconBytes = await getOrDownloadCachedIcon(`wiki-entities/${bareId}.${extension}`, imageUrl)
-    return [bareId, iconBytes !== null ? `data:image/${extension};base64,${iconBytes.toString('base64')}` : null]
+    return [bareId, iconBytes !== null ? toBundledIconSrc('wiki-entities', bareId, extension, iconBytes) : null]
   }))
 
   const resolvedIconsByBareId: Record<string, string> = {}

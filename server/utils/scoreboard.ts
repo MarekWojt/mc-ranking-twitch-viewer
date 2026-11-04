@@ -34,6 +34,12 @@ export interface Scoreboard {
   scoreGroupFactors: PointsByScoreGroup
 }
 
+type ScoredParticipantWithoutCurrentStatus = Omit<ScoredParticipant, 'isOnlineOnMinecraftServer' | 'isLiveOnTwitch' | 'twitchStreamTitle' | 'twitchStreamGame'>
+
+interface ComputedScores extends Omit<Scoreboard, 'participants'> {
+  participants: ScoredParticipantWithoutCurrentStatus[]
+}
+
 export function toOldestFetchedAt(fetchedAtTimestamps: string[]): string {
   return [...fetchedAtTimestamps].sort()[0]!
 }
@@ -47,15 +53,13 @@ async function loadOrFallback<T>(loadValue: () => Promise<TimestampedValue<T>>, 
   }
 }
 
-export async function computeScoreboard(): Promise<Scoreboard> {
+async function computeScores(): Promise<ComputedScores> {
   const [
-    participantsResult, statsResult, onlineStatusResult, liveStreamsResult, profileImageUrlsResult, advancementScoreboard,
+    participantsResult, statsResult, profileImageUrlsResult, advancementScoreboard,
     vanillaDisplayNamesEn, vanillaDisplayNamesDe
   ] = await Promise.all([
     loadParticipants(),
     loadAllPlayerStats(),
-    getOnlinePlayerUuids(),
-    loadOrFallback(getLiveTwitchStreamsByLogin, {}, 'Twitch-Live-Status konnte nicht abgerufen werden, alle Teilnehmer gelten als nicht live:'),
     loadOrFallback(getTwitchProfileImageUrlsByLogin, {}, 'Twitch-Profilbilder konnten nicht abgerufen werden:'),
     computeAdvancementScoreboard(),
     loadVanillaStatisticDisplayNamesByLocale('en'),
@@ -64,19 +68,14 @@ export async function computeScoreboard(): Promise<Scoreboard> {
 
   const participants = participantsResult.value
   const statsByMinecraftUuid = statsResult.value
-  const onlinePlayerUuids = onlineStatusResult.value
-  const liveStreamsByTwitchLogin = liveStreamsResult.value
   const profileImageUrlByTwitchLogin = profileImageUrlsResult.value
   // profile pictures are left out: they are cached for an hour and say nothing about how current the shown values are
   const asOf = toOldestFetchedAt([
     participantsResult.fetchedAt,
     statsResult.fetchedAt,
-    onlineStatusResult.fetchedAt,
-    liveStreamsResult.fetchedAt,
     advancementScoreboard.asOf
   ])
 
-  const onlinePlayerUuidSet = new Set(onlinePlayerUuids)
   const statisticDefinitions = collectStatisticDefinitions(statsByMinecraftUuid, { en: vanillaDisplayNamesEn, de: vanillaDisplayNamesDe })
 
   getMinecraftIconBundle(statisticDefinitions, advancementScoreboard.advancements.map(scoredAdvancement => scoredAdvancement.definition)).catch((error) => {
@@ -161,20 +160,66 @@ export async function computeScoreboard(): Promise<Scoreboard> {
     statisticDefinitions,
     advancements: scaledAdvancements,
     scoreGroupFactors,
-    participants: rankedParticipants.map(({ participant, totalScore, rank }) => {
-      const liveStream = participant.twitchLogin !== null ? liveStreamsByTwitchLogin[participant.twitchLogin] : undefined
+    participants: rankedParticipants.map(({ participant, totalScore, rank }) => ({
+      participant,
+      totalScore,
+      rank,
+      percentOfLeaderScore: leaderScore === 0 ? 0 : (totalScore / leaderScore) * 100,
+      twitchProfileImageUrl: participant.twitchLogin !== null ? profileImageUrlByTwitchLogin[participant.twitchLogin] ?? null : null,
+      statistics: (statisticScoresByParticipantId.get(participant.id) ?? []).sort((a, b) => b.pointsWithoutStatisticWeight - a.pointsWithoutStatisticWeight)
+    }))
+  }
+}
+
+// computing the scores blocks the whole server for 100-200 ms and every page and every poll of every open tab needs them, so
+// simultaneous requests queued up behind each other for seconds; expired scores are computed again before answering, for the
+// same reason as FRESH_DATA_CACHE_OPTIONS
+const SCORES_REUSE_DURATION_MILLISECONDS = 60_000
+
+let latestScores: { scores: ComputedScores, computedAt: number } | undefined
+let pendingScoresComputation: Promise<ComputedScores> | undefined
+
+// kept in memory because defineCachedFunction would copy their hundreds of thousands of entries through JSON on every use
+async function getRecentlyComputedScores(): Promise<ComputedScores> {
+  if (latestScores && Date.now() - latestScores.computedAt < SCORES_REUSE_DURATION_MILLISECONDS) {
+    return latestScores.scores
+  }
+
+  pendingScoresComputation ??= computeScores()
+    .then((scores) => {
+      latestScores = { scores, computedAt: Date.now() }
+      return scores
+    })
+    .finally(() => {
+      pendingScoresComputation = undefined
+    })
+  return pendingScoresComputation
+}
+
+// online and live status keep their own shorter cache times and are cheap to combine with the scores; all callers share the
+// statistics and advancements of the returned scoreboard and must not modify them
+export async function getScoreboard(): Promise<Scoreboard> {
+  const [scores, onlineStatusResult, liveStreamsResult] = await Promise.all([
+    getRecentlyComputedScores(),
+    getOnlinePlayerUuids(),
+    loadOrFallback(getLiveTwitchStreamsByLogin, {}, 'Twitch-Live-Status konnte nicht abgerufen werden, alle Teilnehmer gelten als nicht live:')
+  ])
+
+  const onlinePlayerUuidSet = new Set(onlineStatusResult.value)
+
+  return {
+    ...scores,
+    asOf: toOldestFetchedAt([scores.asOf, onlineStatusResult.fetchedAt, liveStreamsResult.fetchedAt]),
+    participants: scores.participants.map((scoredParticipant) => {
+      const { twitchLogin, minecraftUuid } = scoredParticipant.participant
+      const liveStream = twitchLogin !== null ? liveStreamsResult.value[twitchLogin] : undefined
 
       return {
-        participant,
-        totalScore,
-        rank,
-        percentOfLeaderScore: leaderScore === 0 ? 0 : (totalScore / leaderScore) * 100,
-        isOnlineOnMinecraftServer: onlinePlayerUuidSet.has(participant.minecraftUuid),
+        ...scoredParticipant,
+        isOnlineOnMinecraftServer: onlinePlayerUuidSet.has(minecraftUuid),
         isLiveOnTwitch: liveStream !== undefined,
         twitchStreamTitle: liveStream?.title ?? null,
-        twitchStreamGame: liveStream?.gameName ?? null,
-        twitchProfileImageUrl: participant.twitchLogin !== null ? profileImageUrlByTwitchLogin[participant.twitchLogin] ?? null : null,
-        statistics: (statisticScoresByParticipantId.get(participant.id) ?? []).sort((a, b) => b.pointsWithoutStatisticWeight - a.pointsWithoutStatisticWeight)
+        twitchStreamGame: liveStream?.gameName ?? null
       }
     })
   }

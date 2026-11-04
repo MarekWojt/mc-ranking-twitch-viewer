@@ -6,7 +6,7 @@ interface StatisticParticipantScoreEntry {
 }
 
 export default defineEventHandler(async (): Promise<ScoredDataWithFreshness<StatisticListItemDto[]>> => {
-  const scoreboard = await computeScoreboard()
+  const scoreboard = await getScoreboard()
 
   const scoresBySlug = new Map<string, StatisticParticipantScoreEntry[]>()
   for (const scoredParticipant of scoreboard.participants) {
