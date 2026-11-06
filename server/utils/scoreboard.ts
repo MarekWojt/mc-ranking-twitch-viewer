@@ -215,7 +215,7 @@ export async function getScoreboard(): Promise<Scoreboard> {
   const [scores, onlineStatusResult, liveStreamsResult] = await Promise.all([
     getRecentlyComputedScores(),
     getOnlinePlayerUuids(),
-    loadOrFallback(getLiveTwitchStreamsByLogin, {}, 'Twitch-Live-Status konnte nicht abgerufen werden, alle Teilnehmer gelten als nicht live:')
+    getLiveTwitchStreamsByLogin()
   ])
 
   const onlinePlayerUuidSet = new Set(onlineStatusResult.value)

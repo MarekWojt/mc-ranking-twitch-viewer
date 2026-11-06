@@ -31,26 +31,33 @@ async function readParticipantsConfigFile(): Promise<string> {
   }
 }
 
-interface ParticipantConfigEntryResolution {
-  rawEntry: ParticipantConfigEntry
-  completion: (ParticipantConfigFieldCompletion & { entry: ResolvedParticipantConfigEntry }) | null
+interface ResolvedParticipantConfigCompletion extends ParticipantConfigFieldCompletion {
+  entry: ResolvedParticipantConfigEntry
+  isDisplayNameProvisional: boolean
 }
 
-function toOrderedTomlEntry(entry: ResolvedParticipantConfigEntry): ParticipantConfigEntry {
-  const tomlEntry: ParticipantConfigEntry = {
-    id: entry.id,
-    displayName: entry.displayName,
-    minecraftUuid: entry.minecraftUuid
-  }
-  if (entry.minecraftName) tomlEntry.minecraftName = entry.minecraftName
-  if (entry.twitchLogin) tomlEntry.twitchLogin = entry.twitchLogin
+interface ParticipantConfigEntryResolution {
+  rawEntry: ParticipantConfigEntry
+  completion: ResolvedParticipantConfigCompletion | null
+}
+
+function toOrderedTomlEntry({ id, displayName, minecraftUuid, minecraftName, twitchLogin }: ParticipantConfigEntry): ParticipantConfigEntry {
+  const tomlEntry: ParticipantConfigEntry = {}
+  if (id) tomlEntry.id = id
+  if (displayName) tomlEntry.displayName = displayName
+  if (minecraftUuid) tomlEntry.minecraftUuid = minecraftUuid
+  if (minecraftName) tomlEntry.minecraftName = minecraftName
+  if (twitchLogin) tomlEntry.twitchLogin = twitchLogin
   return tomlEntry
 }
 
 async function writeParticipantsConfigFileFromScratch(entryResolutions: ParticipantConfigEntryResolution[]): Promise<void> {
-  const tomlEntries = entryResolutions.map(({ rawEntry, completion }) =>
-    completion ? toOrderedTomlEntry(completion.entry) : rawEntry
-  )
+  const tomlEntries = entryResolutions.map(({ rawEntry, completion }) => {
+    if (!completion) return rawEntry
+    return toOrderedTomlEntry(completion.isDisplayNameProvisional
+      ? { ...completion.entry, id: rawEntry.id, displayName: rawEntry.displayName }
+      : completion.entry)
+  })
   const tomlContents = stringifyToml({ participants: tomlEntries })
   await writeFile(resolveParticipantsConfigFilePath(), tomlContents, 'utf8')
 }
@@ -67,7 +74,7 @@ function takeLookedUpValueOrThrow<Value>(lookup: CachedValueLookup<Value>, looke
 
 // never waits for Mojang or Twitch: values that are not known yet are looked up in the background and the entry is skipped until
 // then, so a slow lookup or a misspelled name in participants.toml cannot hold up every page
-function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entryIndex: number): ParticipantConfigFieldCompletion & { entry: ResolvedParticipantConfigEntry } {
+function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entryIndex: number): ResolvedParticipantConfigCompletion {
   const resolvedEntry: ParticipantConfigEntry = { ...entry }
   const entryDescription = describeParticipantConfigEntryForErrors(entry, entryIndex)
   const wasIdDerived = !resolvedEntry.id
@@ -125,7 +132,18 @@ function resolveParticipantConfigEntry(entry: ParticipantConfigEntry, entryIndex
     resolvedEntry.id = slugify(resolvedEntry.displayName!)
   }
 
-  return { entry: resolvedEntry as ResolvedParticipantConfigEntry, wasIdDerived, wasDisplayNameDerived, wasMinecraftUuidDerived, wasMinecraftNameDerived }
+  // after a failed lookup the login keeps the participant visible, but only a name confirmed by Twitch may reach participants.toml,
+  // because a name stored there is never looked up again
+  const isDisplayNameProvisional = twitchDisplayNameLookup?.status === 'failed'
+
+  return {
+    entry: resolvedEntry as ResolvedParticipantConfigEntry,
+    wasIdDerived: wasIdDerived && !isDisplayNameProvisional,
+    wasDisplayNameDerived: wasDisplayNameDerived && !isDisplayNameProvisional,
+    wasMinecraftUuidDerived,
+    wasMinecraftNameDerived,
+    isDisplayNameProvisional
+  }
 }
 
 function resolveParticipantConfigEntriesTolerantly(rawEntries: ParticipantConfigEntry[]): ParticipantConfigEntryResolution[] {

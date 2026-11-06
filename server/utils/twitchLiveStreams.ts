@@ -61,9 +61,14 @@ const liveTwitchStreamsCache = createBackgroundRefreshedCache<TimestampedValue<R
   refreshIntervalMilliseconds: LIVE_STATUS_REFRESH_INTERVAL_MILLISECONDS
 })
 
-export function getLiveTwitchStreamsByLogin(): Promise<TimestampedValue<Record<string, TwitchLiveStream>>> {
-  return liveTwitchStreamsCache.getValueWaitingBrieflyIfOutdated('all', {
-    outdatedAfterMilliseconds: LIVE_STATUS_OUTDATED_AFTER_MILLISECONDS,
-    maxWaitMilliseconds: LIVE_STATUS_MAX_WAIT_MILLISECONDS
-  })
+export async function getLiveTwitchStreamsByLogin(): Promise<TimestampedValue<Record<string, TwitchLiveStream>>> {
+  try {
+    return await liveTwitchStreamsCache.getValueWaitingBrieflyIfOutdated('all', {
+      outdatedAfterMilliseconds: LIVE_STATUS_OUTDATED_AFTER_MILLISECONDS,
+      maxWaitMilliseconds: LIVE_STATUS_MAX_WAIT_MILLISECONDS
+    })
+  } catch {
+    // not logged: the cache reports every failed load once, while an open page asks for the status every 2 seconds
+    return { value: {}, fetchedAt: new Date().toISOString() }
+  }
 }

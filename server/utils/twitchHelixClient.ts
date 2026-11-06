@@ -17,11 +17,6 @@ export async function loadSortedParticipantTwitchLogins(): Promise<string[]> {
   )].sort()
 }
 
-function isUnauthorizedFetchError(error: unknown): boolean {
-  return (error as { response?: { status?: number } })?.response?.status === 401
-    || (error as { statusCode?: number })?.statusCode === 401
-}
-
 export async function fetchTwitchHelixWithTokenRetry<T>(fetchWithAccessToken: (accessToken: string) => Promise<T>): Promise<T> {
   const cachedAccessToken = await getTwitchAppAccessToken()
   try {

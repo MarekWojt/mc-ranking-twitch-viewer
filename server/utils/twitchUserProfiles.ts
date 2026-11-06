@@ -48,6 +48,24 @@ interface TwitchProfileImageUrlsLoad {
   profileImageUrls: TimestampedValue<Record<string, string>>
 }
 
+async function readLastKnownTwitchProfileImageUrls(): Promise<TimestampedValue<Record<string, string>> | null> {
+  try {
+    return JSON.parse(await readFile(LAST_KNOWN_TWITCH_PROFILE_IMAGE_URLS_FILE_PATH, 'utf8')) as TimestampedValue<Record<string, string>>
+  } catch (error) {
+    // read on every restart: a file damaged by a crash while writing must not cost more than the pictures it held
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.error('Gespeicherte Twitch-Profilbilder konnten nicht gelesen werden:', error)
+    return null
+  }
+}
+
+// the requested list is temporarily shorter or even empty while entries of participants.toml are skipped, and that must not
+// lose pictures that are needed after a restart
+async function addToLastKnownTwitchProfileImageUrls({ value, fetchedAt }: TimestampedValue<Record<string, string>>): Promise<void> {
+  const lastKnownProfileImageUrls = await readLastKnownTwitchProfileImageUrls()
+  await mkdir(dirname(LAST_KNOWN_TWITCH_PROFILE_IMAGE_URLS_FILE_PATH), { recursive: true })
+  await writeFile(LAST_KNOWN_TWITCH_PROFILE_IMAGE_URLS_FILE_PATH, JSON.stringify({ value: { ...lastKnownProfileImageUrls?.value, ...value }, fetchedAt }))
+}
+
 async function fetchProfileImageUrlsOfParticipants(): Promise<TwitchProfileImageUrlsLoad> {
   const requestedTwitchLogins = await loadSortedParticipantTwitchLogins()
   const batchResults = await Promise.all(splitIntoBatches(requestedTwitchLogins, TWITCH_HELIX_LOGIN_BATCH_SIZE).map(fetchUserProfilesBatch))
@@ -56,8 +74,7 @@ async function fetchProfileImageUrlsOfParticipants(): Promise<TwitchProfileImage
     batchResults.flat().map(entry => [entry.login.toLowerCase(), entry.profile_image_url])
   )
   const profileImageUrls = { value: profileImageUrlByTwitchLogin, fetchedAt: new Date().toISOString() }
-  await mkdir(dirname(LAST_KNOWN_TWITCH_PROFILE_IMAGE_URLS_FILE_PATH), { recursive: true })
-  await writeFile(LAST_KNOWN_TWITCH_PROFILE_IMAGE_URLS_FILE_PATH, JSON.stringify(profileImageUrls))
+  await addToLastKnownTwitchProfileImageUrls(profileImageUrls)
   return { requestedTwitchLogins, profileImageUrls }
 }
 
@@ -67,30 +84,19 @@ const twitchProfileImageUrlsCache = createBackgroundRefreshedCache<TwitchProfile
   refreshIntervalMilliseconds: 60 * 60 * 1000
 })
 
-async function readLastKnownTwitchProfileImageUrls(): Promise<TimestampedValue<Record<string, string>> | null> {
-  try {
-    return JSON.parse(await readFile(LAST_KNOWN_TWITCH_PROFILE_IMAGE_URLS_FILE_PATH, 'utf8')) as TimestampedValue<Record<string, string>>
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
-    throw error
-  }
-}
-
 export async function getTwitchProfileImageUrlsByLogin(): Promise<TimestampedValue<Record<string, string>>> {
-  let profileImageUrlsLoad: TwitchProfileImageUrlsLoad
-  try {
-    profileImageUrlsLoad = await twitchProfileImageUrlsCache.getStoredValueOrWaitForFirstLoad('all')
-  } catch (error) {
-    // without this a Twitch outage right after a restart would replace every profile picture with a placeholder
+  const profileImageUrlsLookup = twitchProfileImageUrlsCache.lookUpWithoutWaiting('all')
+  if (profileImageUrlsLookup.status !== 'stored') {
+    // right after a restart the pictures on disk are good enough, so a slow Twitch cannot make the first page wait for them
     const lastKnownProfileImageUrls = await readLastKnownTwitchProfileImageUrls()
-    if (!lastKnownProfileImageUrls) throw error
-    return lastKnownProfileImageUrls
+    if (lastKnownProfileImageUrls) return lastKnownProfileImageUrls
+    return (await twitchProfileImageUrlsCache.getStoredValueOrWaitForFirstLoad('all')).profileImageUrls
   }
 
   // participants added to participants.toml get their picture with one of the next requests instead of after an hour
   const currentTwitchLogins = await loadSortedParticipantTwitchLogins()
-  if (currentTwitchLogins.join('\n') !== profileImageUrlsLoad.requestedTwitchLogins.join('\n')) {
+  if (currentTwitchLogins.join('\n') !== profileImageUrlsLookup.value.requestedTwitchLogins.join('\n')) {
     twitchProfileImageUrlsCache.refreshInBackground('all')
   }
-  return profileImageUrlsLoad.profileImageUrls
+  return profileImageUrlsLookup.value.profileImageUrls
 }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
-const { data: response } = await usePolledParticipantList()
+const { data: response, error: loadError } = await usePolledParticipantList()
+if (loadError.value) throw createPageLoadError(loadError.value)
 
 const participants = computed(() => response.value?.payload ?? [])
 const dataAsOf = computed(() => response.value?.asOf ?? null)

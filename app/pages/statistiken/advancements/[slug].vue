@@ -4,10 +4,10 @@ import type { TableColumn } from '@nuxt/ui'
 const route = useRoute()
 const advancementSlug = route.params.slug as string
 
-const { data: response, refresh } = await useApiFetch<DataWithFreshness<AdvancementDetailDto>>(`/api/advancements/${advancementSlug}`)
+const { data: response, error: loadError, refresh } = await useApiFetch<DataWithFreshness<AdvancementDetailDto>>(`/api/advancements/${advancementSlug}`)
 
-if (!response.value) {
-  throw createError({ statusCode: 404, statusMessage: 'Advancement nicht gefunden' })
+if (loadError.value) {
+  throw createPageLoadError(loadError.value, 'Advancement nicht gefunden')
 }
 
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS, () => response.value?.dataVersions)

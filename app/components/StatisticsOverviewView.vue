@@ -78,10 +78,12 @@ const activeStatisticTab = computed({
   set: (newTab: string) => navigateTo({ path: `/statistiken/${newTab}`, query: currentQueryOverrides() })
 })
 
-const { data: response, refresh } = await useApiFetch<ScoredDataWithFreshness<StatisticListItemDto[]>>('/api/statistics')
+const { data: response, error: statisticsLoadError, refresh } = await useApiFetch<ScoredDataWithFreshness<StatisticListItemDto[]>>('/api/statistics')
+if (statisticsLoadError.value) throw createPageLoadError(statisticsLoadError.value)
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS, () => response.value?.dataVersions)
 
-const { data: advancementsResponse, refresh: refreshAdvancements } = await useApiFetch<ScoredDataWithFreshness<AdvancementListItemDto[]>>('/api/advancements')
+const { data: advancementsResponse, error: advancementsLoadError, refresh: refreshAdvancements } = await useApiFetch<ScoredDataWithFreshness<AdvancementListItemDto[]>>('/api/advancements')
+if (advancementsLoadError.value) throw createPageLoadError(advancementsLoadError.value)
 useAutoRefresh(refreshAdvancements, DATA_POLLING_INTERVAL_MILLISECONDS, () => advancementsResponse.value?.dataVersions)
 
 const { iconBundle, isIconBundleLoading } = useMinecraftIconBundle()

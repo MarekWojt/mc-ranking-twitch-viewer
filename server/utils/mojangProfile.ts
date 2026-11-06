@@ -32,8 +32,8 @@ interface MojangSessionProfile {
 
 const mojangApiRequestQueue = createConcurrencyLimitedQueue(1, 650)
 
-function enqueueMojangRequest<T>(request: () => Promise<T>, { isUrgent }: CachedValueLoadContext): Promise<T> {
-  return mojangApiRequestQueue(request, { isBackgroundTask: !isUrgent })
+function enqueueMojangRequest<T>(request: () => Promise<T>, loadContext: CachedValueLoadContext): Promise<T> {
+  return mojangApiRequestQueue(request, { isBackgroundTask: () => !loadContext.isUrgent })
 }
 
 async function fetchMinecraftUuidByName(minecraftName: string, loadContext: CachedValueLoadContext): Promise<string> {

@@ -9,19 +9,15 @@ function useParticipantListFetchedAt() {
 export function usePolledParticipantList() {
   const fetchedAt = useParticipantListFetchedAt()
   const apiCacheBustingQuery = useApiCacheBustingQuery()
-  const participantListRequest = useAsyncData(PARTICIPANT_LIST_DATA_KEY, async (nuxtApp, { signal }) => {
-    const previousResponse = nuxtApp.payload.data[PARTICIPANT_LIST_DATA_KEY] as DataWithFreshness<ParticipantListItemDto[]> | undefined
-    try {
+  const participantListRequest = useAsyncData(PARTICIPANT_LIST_DATA_KEY, (nuxtApp, { signal }) => keepPreviousResponseIfRefreshFails(
+    async () => {
       const response = await $fetch<DataWithFreshness<ParticipantListItemDto[]>>('/api/participants', { signal, query: apiCacheBustingQuery })
       fetchedAt.value = Date.now()
       return response
-    } catch (error) {
-      // Nuxt empties the data when a refresh fails (e.g. while the server restarts), which would blank the list until the
-      // next successful poll; the freshness note still shows how old the kept list is
-      if (previousResponse && !signal.aborted) return previousResponse
-      throw error
-    }
-  })
+    },
+    nuxtApp.payload.data[PARTICIPANT_LIST_DATA_KEY] as DataWithFreshness<ParticipantListItemDto[]> | undefined,
+    signal
+  ))
   useAutoRefresh(participantListRequest.refresh, DATA_POLLING_INTERVAL_MILLISECONDS, () => participantListRequest.data.value?.dataVersions)
 
   return participantListRequest

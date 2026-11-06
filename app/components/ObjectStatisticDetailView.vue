@@ -27,12 +27,12 @@ interface ResolvedObjectStatisticDetail {
   participants: ResolvedObjectStatisticParticipantRow[]
 }
 
-const { data: response, refresh } = await useApiFetch<ScoredDataWithFreshness<ObjectStatisticDetailDto>>(
+const { data: response, error: loadError, refresh } = await useApiFetch<ScoredDataWithFreshness<ObjectStatisticDetailDto>>(
   () => `/api/statistics/${props.kind}/${props.bareKey}`
 )
 
-if (!response.value) {
-  throw createError({ statusCode: 404, statusMessage: props.kind === 'items' ? 'Item nicht gefunden' : 'Entity nicht gefunden' })
+if (loadError.value) {
+  throw createPageLoadError(loadError.value, props.kind === 'items' ? 'Item nicht gefunden' : 'Entity nicht gefunden')
 }
 
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS, () => response.value?.dataVersions)

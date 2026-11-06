@@ -58,10 +58,10 @@ interface PivotedParticipantRow {
 const route = useRoute()
 const participantId = route.params.id as string
 
-const { data: response, refresh } = await useApiFetch<ScoredDataWithFreshness<ParticipantDetailDto>>(`/api/participants/${participantId}`)
+const { data: response, error: loadError, refresh } = await useApiFetch<ScoredDataWithFreshness<ParticipantDetailDto>>(`/api/participants/${participantId}`)
 
-if (!response.value) {
-  throw createError({ statusCode: 404, statusMessage: 'Teilnehmer nicht gefunden' })
+if (loadError.value) {
+  throw createPageLoadError(loadError.value, 'Teilnehmer nicht gefunden')
 }
 
 useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS, () => response.value?.dataVersions)
