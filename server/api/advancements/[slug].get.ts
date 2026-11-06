@@ -34,6 +34,7 @@ export default defineEventHandler(async (event): Promise<DataWithFreshness<Advan
 
   return {
     asOf: scoreboard.asOf,
+    dataVersions: { scores: scoreboard.scoresVersion },
     payload: {
       slug: scoredAdvancement.definition.slug,
       label: scoredAdvancement.definition.label,

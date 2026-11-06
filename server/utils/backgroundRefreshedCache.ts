@@ -14,6 +14,11 @@ export interface LookUpWithoutWaitingOptions {
   isUrgent?: boolean
 }
 
+export interface BriefWaitForOutdatedValueOptions {
+  outdatedAfterMilliseconds: number
+  maxWaitMilliseconds: number
+}
+
 interface BackgroundRefreshedCacheOptions<Value> {
   describeValue: (key: string) => string
   load: (key: string, loadContext: CachedValueLoadContext) => Promise<Value>
@@ -23,6 +28,7 @@ interface BackgroundRefreshedCacheOptions<Value> {
 interface CacheEntry<Value> {
   stored?: { value: Value, loadedAt: number }
   pendingLoad?: Promise<void>
+  pendingLoadStartedAt?: number
   lastFailure?: { error: unknown, failedAt: number }
 }
 
@@ -52,6 +58,7 @@ export function createBackgroundRefreshedCache<Value>({ describeValue, load, ref
 
   function startLoad(key: string, entry: CacheEntry<Value>, loadContext: CachedValueLoadContext) {
     const hadStoredValue = entry.stored !== undefined
+    entry.pendingLoadStartedAt = Date.now()
     entry.pendingLoad = load(key, loadContext)
       .then((value) => {
         entry.stored = { value, loadedAt: Date.now() }
@@ -97,10 +104,36 @@ export function createBackgroundRefreshedCache<Value>({ describeValue, load, ref
     return takeStoredValueOrThrowLastFailure(entry)
   }
 
+  function waitForLoadAtMost(pendingLoad: Promise<void>, maxWaitMilliseconds: number): Promise<void> {
+    return new Promise((resolve) => {
+      const timeoutId = setTimeout(resolve, maxWaitMilliseconds)
+      pendingLoad.then(() => {
+        clearTimeout(timeoutId)
+        resolve()
+      })
+    })
+  }
+
+  // refreshes only start with a request, so after a quiet time the stored value is as old as the pause and showing it would be
+  // misleading; the exception to never waiting is limited to that case, and the time counts from the start of the load instead of
+  // per request, so a hanging service delays only the requests right at its start and never the ones after them
+  async function getValueWaitingBrieflyIfOutdated(key: string, { outdatedAfterMilliseconds, maxWaitMilliseconds }: BriefWaitForOutdatedValueOptions): Promise<Value> {
+    const entry = getOrCreateEntry(key)
+    if (!entry.stored) return getStoredValueOrWaitForFirstLoad(key)
+
+    startLoadIfDue(key, entry)
+    const isOutdated = Date.now() - entry.stored.loadedAt >= outdatedAfterMilliseconds
+    if (isOutdated && entry.pendingLoad) {
+      const remainingWaitMilliseconds = entry.pendingLoadStartedAt! + maxWaitMilliseconds - Date.now()
+      if (remainingWaitMilliseconds > 0) await waitForLoadAtMost(entry.pendingLoad, remainingWaitMilliseconds)
+    }
+    return entry.stored.value
+  }
+
   function refreshInBackground(key: string) {
     const entry = getOrCreateEntry(key)
     if (canStartLoad(entry)) startLoad(key, entry, { isUrgent: false })
   }
 
-  return { lookUpWithoutWaiting, getStoredValueOrWaitForFirstLoad, refreshInBackground }
+  return { lookUpWithoutWaiting, getStoredValueOrWaitForFirstLoad, getValueWaitingBrieflyIfOutdated, refreshInBackground }
 }

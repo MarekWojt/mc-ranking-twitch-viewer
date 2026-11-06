@@ -20,7 +20,10 @@ const participantGroupSections = computed(() => [
       <h1 class="text-2xl font-semibold">
         Teilnehmer
       </h1>
-      <DataFreshnessNote :as-of="dataAsOf" />
+      <DataFreshnessNote
+        :as-of="dataAsOf"
+        :data-versions="response?.dataVersions"
+      />
     </div>
 
     <section

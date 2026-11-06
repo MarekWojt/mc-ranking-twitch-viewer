@@ -10,7 +10,7 @@ if (!response.value) {
   throw createError({ statusCode: 404, statusMessage: 'Advancement nicht gefunden' })
 }
 
-useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
+useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS, () => response.value?.dataVersions)
 
 const { resolvedAdvancementsLocale } = useMinecraftNameLocale()
 
@@ -77,7 +77,10 @@ function openParticipantDetail(_event: Event, row: { original: AdvancementPartic
           </p>
         </div>
       </div>
-      <DataFreshnessNote :as-of="dataAsOf" />
+      <DataFreshnessNote
+        :as-of="dataAsOf"
+        :data-versions="response?.dataVersions"
+      />
     </div>
 
     <UTable

@@ -17,6 +17,7 @@ export default defineEventHandler(async (event): Promise<ScoredDataWithFreshness
 
   return {
     asOf: scoreboard.asOf,
+    dataVersions: { scores: scoreboard.scoresVersion, status: scoreboard.statusVersion },
     scoreGroupFactors: scoreboard.scoreGroupFactors,
     payload: toParticipantDetailDto(scoredParticipant, participantAdvancements)
   }

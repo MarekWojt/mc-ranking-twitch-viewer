@@ -35,7 +35,7 @@ if (!response.value) {
   throw createError({ statusCode: 404, statusMessage: props.kind === 'items' ? 'Item nicht gefunden' : 'Entity nicht gefunden' })
 }
 
-useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
+useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS, () => response.value?.dataVersions)
 
 // the object name (item/entity identity) follows "Items & Entities"; the per-category column headers follow "Statistiken"
 const { resolvedObjectsLocale, resolvedStatisticsLocale } = useMinecraftNameLocale()
@@ -187,7 +187,10 @@ function openParticipantDetail(_event: Event, row: { original: ResolvedObjectSta
         </h1>
       </div>
       <div class="flex flex-col items-end gap-1">
-        <DataFreshnessNote :as-of="dataAsOf" />
+        <DataFreshnessNote
+          :as-of="dataAsOf"
+          :data-versions="response?.dataVersions"
+        />
         <div class="flex items-center gap-3 text-sm">
           <button
             type="button"

@@ -30,6 +30,7 @@ export default defineEventHandler(async (event): Promise<DataWithFreshness<Stati
 
   return {
     asOf: scoreboard.asOf,
+    dataVersions: { scores: scoreboard.scoresVersion },
     payload: {
       slug: statisticDefinition.slug,
       label: statisticDefinition.label,

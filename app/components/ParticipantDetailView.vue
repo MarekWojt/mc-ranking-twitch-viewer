@@ -64,7 +64,7 @@ if (!response.value) {
   throw createError({ statusCode: 404, statusMessage: 'Teilnehmer nicht gefunden' })
 }
 
-useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
+useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS, () => response.value?.dataVersions)
 
 const participant = computed(() => response.value?.payload ?? null)
 const dataAsOf = computed(() => response.value?.asOf ?? null)
@@ -450,7 +450,10 @@ const entityPivotColumns = computed<TableColumn<PivotedParticipantRow>[]>(() => 
     class="py-10 space-y-8"
   >
     <div class="flex items-center justify-end">
-      <DataFreshnessNote :as-of="dataAsOf" />
+      <DataFreshnessNote
+        :as-of="dataAsOf"
+        :data-versions="response?.dataVersions"
+      />
     </div>
 
     <component

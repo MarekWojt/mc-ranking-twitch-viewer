@@ -41,8 +41,10 @@ export function useMinecraftIconBundle() {
   const cacheBustingQuery = useApiCacheBustingQuery()
   const loadIconBundleIfNeeded = () => downloadIconBundleIfIconsChanged(cacheBustingQuery)
 
-  onMounted(loadIconBundleIfNeeded)
-  useAutoRefresh(loadIconBundleIfNeeded, ICON_BUNDLE_UPDATE_CHECK_INTERVAL_MILLISECONDS)
+  onMounted(() => {
+    if (iconBundle.value === null) downloadIconBundle(cacheBustingQuery)
+  })
+  useAutoRefresh(loadIconBundleIfNeeded, ICON_BUNDLE_UPDATE_CHECK_INTERVAL_MILLISECONDS, () => ({ iconBundle: iconBundle.value?.version }))
 
   return { iconBundle, isIconBundleLoading }
 }

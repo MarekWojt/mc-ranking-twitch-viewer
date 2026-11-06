@@ -1,30 +1,58 @@
-// a forgotten tab used to load the same data around the clock, which caused more traffic than everything else together; hidden
-// tabs therefore stop asking, and a tab that becomes visible again only asks right away if its last refresh is older than the interval
-export function useAutoRefresh(refresh: () => Promise<unknown>, intervalMilliseconds: number): void {
+export function useAutoRefresh(
+  refresh: () => Promise<unknown>,
+  pollingIntervalMilliseconds: number,
+  getLoadedDataVersions: () => DataVersions | undefined
+): void {
+  const { latestLiveUpdate, liveUpdateStreamState, startLiveUpdateStream } = useLiveUpdateStream()
+  let isMounted = false
   let lastRefreshAt = 0
-  let nextRefreshTimeoutId: ReturnType<typeof setTimeout> | undefined
+  let isRefreshRunning = false
+  let nextPollTimeoutId: ReturnType<typeof setTimeout> | undefined
 
-  function scheduleNextRefresh() {
-    nextRefreshTimeoutId = setTimeout(() => {
+  async function refreshIfLiveUpdateReportsChange() {
+    const liveUpdate = latestLiveUpdate.value
+    // the last message of a stream that stopped working says nothing about data a page has loaded since then
+    if (!isMounted || isRefreshRunning || liveUpdate === null || liveUpdateStreamState.value !== 'working') return
+    if (areDataVersionsCurrent(getLoadedDataVersions(), liveUpdate)) return
+
+    isRefreshRunning = true
+    lastRefreshAt = Date.now()
+    try {
+      await refresh()
+    } finally {
+      isRefreshRunning = false
+    }
+    if (latestLiveUpdate.value !== liveUpdate) refreshIfLiveUpdateReportsChange()
+  }
+
+  function scheduleNextPoll() {
+    nextPollTimeoutId = setTimeout(() => {
       lastRefreshAt = Date.now()
       refresh()
-      scheduleNextRefresh()
-    }, Math.max(0, lastRefreshAt + intervalMilliseconds - Date.now()))
+      scheduleNextPoll()
+    }, Math.max(0, lastRefreshAt + pollingIntervalMilliseconds - Date.now()))
   }
 
-  function restartOrStopRefreshingForCurrentVisibility() {
-    clearTimeout(nextRefreshTimeoutId)
-    if (document.visibilityState === 'visible') scheduleNextRefresh()
+  function pollOnlyWhileVisibleAndStreamBroken() {
+    clearTimeout(nextPollTimeoutId)
+    if (document.visibilityState === 'visible' && liveUpdateStreamState.value === 'broken') scheduleNextPoll()
   }
+
+  watch(latestLiveUpdate, refreshIfLiveUpdateReportsChange)
+  watch(liveUpdateStreamState, pollOnlyWhileVisibleAndStreamBroken)
 
   onMounted(() => {
+    isMounted = true
     lastRefreshAt = Date.now()
-    document.addEventListener('visibilitychange', restartOrStopRefreshingForCurrentVisibility)
-    restartOrStopRefreshingForCurrentVisibility()
+    startLiveUpdateStream()
+    document.addEventListener('visibilitychange', pollOnlyWhileVisibleAndStreamBroken)
+    pollOnlyWhileVisibleAndStreamBroken()
+    refreshIfLiveUpdateReportsChange()
   })
 
   onUnmounted(() => {
-    document.removeEventListener('visibilitychange', restartOrStopRefreshingForCurrentVisibility)
-    clearTimeout(nextRefreshTimeoutId)
+    isMounted = false
+    document.removeEventListener('visibilitychange', pollOnlyWhileVisibleAndStreamBroken)
+    clearTimeout(nextPollTimeoutId)
   })
 }

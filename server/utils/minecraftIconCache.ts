@@ -64,13 +64,15 @@ const WIKI_ICON_DIRECTORY_PATTERN = /^wiki-[a-z-]+$/
 const MINECRAFT_BARE_ID_PATTERN = /^[a-z0-9_]+$/
 const WIKI_ICON_FILE_EXTENSIONS = ['gif', 'png']
 
-// both values come straight from a public URL, so the patterns are what keeps a request inside the wiki icon directories
-export async function readStoredWikiIcon(iconDirectory: string, bareId: string): Promise<Buffer | null> {
+// directory and id come straight from a public URL, so the patterns are what keeps a request inside the wiki icon directories;
+// an icon can exist in both formats after the wiki changed it, and because browsers keep the response for a year, only the exact
+// file the URL was built from may be served
+export async function readStoredWikiIconWithContentHash(iconDirectory: string, bareId: string, contentHash: string): Promise<Buffer | null> {
   if (!WIKI_ICON_DIRECTORY_PATTERN.test(iconDirectory) || !MINECRAFT_BARE_ID_PATTERN.test(bareId)) return null
 
   for (const extension of WIKI_ICON_FILE_EXTENSIONS) {
     const iconBytes = await readFileIfExists(join(MINECRAFT_ICON_CACHE_DIRECTORY, iconDirectory, `${bareId}.${extension}`))
-    if (iconBytes !== null) return iconBytes
+    if (iconBytes !== null && hashIconContent(iconBytes) === contentHash) return iconBytes
   }
   return null
 }

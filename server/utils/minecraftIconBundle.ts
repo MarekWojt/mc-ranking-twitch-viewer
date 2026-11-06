@@ -48,7 +48,7 @@ function computeIconsVersion({ itemIconsByBareId, entityIconsByBareId, advanceme
   // sorted because the order of the icons depends on the order in which participants and their files are read
   const sortedIconEntries = [itemIconsByBareId, entityIconsByBareId, advancementIconsBySlug]
     .map(icons => Object.entries(icons).sort(([keyA], [keyB]) => keyA < keyB ? -1 : 1))
-  return createHash('sha256').update(JSON.stringify(sortedIconEntries)).digest('hex').slice(0, 16)
+  return buildContentVersion(sortedIconEntries)
 }
 
 function withIconsVersion(iconBundleFile: MinecraftIconBundleFile): StoredMinecraftIconBundle {

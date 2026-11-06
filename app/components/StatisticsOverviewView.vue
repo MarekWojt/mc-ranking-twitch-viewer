@@ -79,10 +79,10 @@ const activeStatisticTab = computed({
 })
 
 const { data: response, refresh } = await useApiFetch<ScoredDataWithFreshness<StatisticListItemDto[]>>('/api/statistics')
-useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
+useAutoRefresh(refresh, DATA_POLLING_INTERVAL_MILLISECONDS, () => response.value?.dataVersions)
 
 const { data: advancementsResponse, refresh: refreshAdvancements } = await useApiFetch<ScoredDataWithFreshness<AdvancementListItemDto[]>>('/api/advancements')
-useAutoRefresh(refreshAdvancements, DATA_POLLING_INTERVAL_MILLISECONDS)
+useAutoRefresh(refreshAdvancements, DATA_POLLING_INTERVAL_MILLISECONDS, () => advancementsResponse.value?.dataVersions)
 
 const { iconBundle, isIconBundleLoading } = useMinecraftIconBundle()
 
@@ -503,7 +503,10 @@ const entityPivotColumns = computed<TableColumn<PivotedStatisticRow>[]>(() => [
         Statistiken
       </h1>
       <div class="flex items-center gap-3">
-        <DataFreshnessNote :as-of="dataAsOf" />
+        <DataFreshnessNote
+          :as-of="dataAsOf"
+          :data-versions="response?.dataVersions"
+        />
         <UInput
           v-model="statisticsSearchQuery"
           icon="i-lucide-search"

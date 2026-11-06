@@ -53,6 +53,7 @@ export async function buildObjectStatisticDetail(
 
   return {
     asOf: scoreboard.asOf,
+    dataVersions: { scores: scoreboard.scoresVersion },
     scoreGroupFactors: scoreboard.scoreGroupFactors,
     payload: { objectKey, objectLabel, categories, groupLabelByCategory, participants }
   }

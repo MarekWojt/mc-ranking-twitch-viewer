@@ -1,5 +1,8 @@
 export default defineEventHandler(async (event) => {
-  const iconBytes = await readStoredWikiIcon(getRouterParam(event, 'iconDirectory')!, getRouterParam(event, 'bareId')!)
+  const { content: contentHash } = getQuery(event)
+  const iconBytes = typeof contentHash === 'string'
+    ? await readStoredWikiIconWithContentHash(getRouterParam(event, 'iconDirectory')!, getRouterParam(event, 'bareId')!, contentHash)
+    : null
   const contentType = iconBytes && detectAnimatedIconContentType(iconBytes)
 
   if (!iconBytes || !contentType) {

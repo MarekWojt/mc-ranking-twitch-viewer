@@ -44,7 +44,10 @@ function openParticipantDetail(_event: Event, row: { original: ParticipantListIt
       <h1 class="text-2xl font-semibold">
         Rangliste
       </h1>
-      <DataFreshnessNote :as-of="dataAsOf" />
+      <DataFreshnessNote
+        :as-of="dataAsOf"
+        :data-versions="response?.dataVersions"
+      />
     </div>
 
     <div class="grid grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))] gap-4">

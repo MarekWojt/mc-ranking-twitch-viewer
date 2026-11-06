@@ -10,8 +10,11 @@ export function detectAnimatedIconContentType(iconBytes: Buffer): AnimatedIconCo
   return null
 }
 
+export function hashIconContent(iconBytes: Buffer): string {
+  return createHash('sha256').update(iconBytes).digest('hex').slice(0, 16)
+}
+
 // deliberately without a file extension, so that a proxy never mistakes this route for a static file
 export function buildAnimatedIconUrl(iconDirectory: string, bareId: string, iconBytes: Buffer): string {
-  const contentHash = createHash('sha256').update(iconBytes).digest('hex').slice(0, 16)
-  return `/api/icons/animated/${iconDirectory}/${bareId}?content=${contentHash}`
+  return `/api/icons/animated/${iconDirectory}/${bareId}?content=${hashIconContent(iconBytes)}`
 }

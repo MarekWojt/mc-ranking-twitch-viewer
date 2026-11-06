@@ -32,11 +32,13 @@ export interface Scoreboard {
   participants: ScoredParticipant[]
   advancements: ScoredAdvancement[]
   scoreGroupFactors: PointsByScoreGroup
+  scoresVersion: string
+  statusVersion: string
 }
 
 type ScoredParticipantWithoutCurrentStatus = Omit<ScoredParticipant, 'isOnlineOnMinecraftServer' | 'isLiveOnTwitch' | 'twitchStreamTitle' | 'twitchStreamGame'>
 
-interface ComputedScores extends Omit<Scoreboard, 'participants'> {
+interface ComputedScores extends Omit<Scoreboard, 'participants' | 'statusVersion'> {
   participants: ScoredParticipantWithoutCurrentStatus[]
 }
 
@@ -160,6 +162,8 @@ async function computeScores(): Promise<ComputedScores> {
     statisticDefinitions,
     advancements: scaledAdvancements,
     scoreGroupFactors,
+    // built from what the scores are computed from, because hashing the finished scores would take several hundred milliseconds
+    scoresVersion: buildContentVersion([participants, statsByMinecraftUuid, statisticDefinitions, advancementScoreboard.advancements, profileImageUrlByTwitchLogin]),
     participants: rankedParticipants.map(({ participant, totalScore, rank }) => ({
       participant,
       totalScore,
@@ -172,27 +176,36 @@ async function computeScores(): Promise<ComputedScores> {
 }
 
 // computing the scores blocks the whole server for 100-200 ms and every page and every poll of every open tab needs them, so
-// simultaneous requests queued up behind each other for seconds; expired scores are computed again before answering, for the
-// same reason as FRESH_DATA_CACHE_OPTIONS
-const SCORES_REUSE_DURATION_MILLISECONDS = 60_000
+// simultaneous requests queued up behind each other for seconds; Minecraft normally writes its stats files only about every
+// 5 minutes anyway; expired scores are computed again before answering, for the same reason as FRESH_DATA_CACHE_OPTIONS
+const SCORES_REUSE_DURATION_MILLISECONDS = 5 * 60 * 1000
+const SCORES_RETRY_DELAY_AFTER_FAILURE_MILLISECONDS = 60 * 1000
 
-let latestScores: { scores: ComputedScores, computedAt: number } | undefined
+let latestScores: ComputedScores | undefined
+let nextScoresComputationAt = 0
 let pendingScoresComputation: Promise<ComputedScores> | undefined
+
+// a failed computation, for example while participants.toml is being saved, must not take down pages that can still show the last scores
+async function computeScoresOrKeepLatest(): Promise<ComputedScores> {
+  try {
+    latestScores = await computeScores()
+    nextScoresComputationAt = Date.now() + SCORES_REUSE_DURATION_MILLISECONDS
+    return latestScores
+  } catch (error) {
+    if (!latestScores) throw error
+    nextScoresComputationAt = Date.now() + SCORES_RETRY_DELAY_AFTER_FAILURE_MILLISECONDS
+    console.error('Punkte konnten nicht neu berechnet werden, die letzten bleiben bestehen und es wird in einer Minute erneut versucht:', error)
+    return latestScores
+  }
+}
 
 // kept in memory because defineCachedFunction would copy their hundreds of thousands of entries through JSON on every use
 async function getRecentlyComputedScores(): Promise<ComputedScores> {
-  if (latestScores && Date.now() - latestScores.computedAt < SCORES_REUSE_DURATION_MILLISECONDS) {
-    return latestScores.scores
-  }
+  if (latestScores && Date.now() < nextScoresComputationAt) return latestScores
 
-  pendingScoresComputation ??= computeScores()
-    .then((scores) => {
-      latestScores = { scores, computedAt: Date.now() }
-      return scores
-    })
-    .finally(() => {
-      pendingScoresComputation = undefined
-    })
+  pendingScoresComputation ??= computeScoresOrKeepLatest().finally(() => {
+    pendingScoresComputation = undefined
+  })
   return pendingScoresComputation
 }
 
@@ -207,20 +220,29 @@ export async function getScoreboard(): Promise<Scoreboard> {
 
   const onlinePlayerUuidSet = new Set(onlineStatusResult.value)
 
+  const participants = scores.participants.map((scoredParticipant) => {
+    const { twitchLogin, minecraftUuid } = scoredParticipant.participant
+    const liveStream = twitchLogin !== null ? liveStreamsResult.value[twitchLogin] : undefined
+
+    return {
+      ...scoredParticipant,
+      isOnlineOnMinecraftServer: onlinePlayerUuidSet.has(minecraftUuid),
+      isLiveOnTwitch: liveStream !== undefined,
+      twitchStreamTitle: liveStream?.title ?? null,
+      twitchStreamGame: liveStream?.gameName ?? null
+    }
+  })
+
   return {
     ...scores,
     asOf: toOldestFetchedAt([scores.asOf, onlineStatusResult.fetchedAt, liveStreamsResult.fetchedAt]),
-    participants: scores.participants.map((scoredParticipant) => {
-      const { twitchLogin, minecraftUuid } = scoredParticipant.participant
-      const liveStream = twitchLogin !== null ? liveStreamsResult.value[twitchLogin] : undefined
-
-      return {
-        ...scoredParticipant,
-        isOnlineOnMinecraftServer: onlinePlayerUuidSet.has(minecraftUuid),
-        isLiveOnTwitch: liveStream !== undefined,
-        twitchStreamTitle: liveStream?.title ?? null,
-        twitchStreamGame: liveStream?.gameName ?? null
-      }
-    })
+    statusVersion: buildContentVersion(participants.map(scoredParticipant => [
+      scoredParticipant.participant.id,
+      scoredParticipant.isOnlineOnMinecraftServer,
+      scoredParticipant.twitchStreamTitle,
+      scoredParticipant.twitchStreamGame,
+      scoredParticipant.isLiveOnTwitch
+    ])),
+    participants
   }
 }

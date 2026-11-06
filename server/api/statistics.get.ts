@@ -24,6 +24,7 @@ export default defineEventHandler(async (): Promise<ScoredDataWithFreshness<Stat
 
   return {
     asOf: scoreboard.asOf,
+    dataVersions: { scores: scoreboard.scoresVersion },
     scoreGroupFactors: scoreboard.scoreGroupFactors,
     payload: scoreboard.statisticDefinitions.map((definition): StatisticListItemDto => {
       const scoresForThisStatistic = scoresBySlug.get(definition.slug) ?? []

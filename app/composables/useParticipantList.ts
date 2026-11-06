@@ -22,7 +22,7 @@ export function usePolledParticipantList() {
       throw error
     }
   })
-  useAutoRefresh(participantListRequest.refresh, DATA_POLLING_INTERVAL_MILLISECONDS)
+  useAutoRefresh(participantListRequest.refresh, DATA_POLLING_INTERVAL_MILLISECONDS, () => participantListRequest.data.value?.dataVersions)
 
   return participantListRequest
 }
@@ -31,6 +31,7 @@ export function useRecentParticipantList() {
   const { data } = useNuxtData<DataWithFreshness<ParticipantListItemDto[]>>(PARTICIPANT_LIST_DATA_KEY)
   const fetchedAt = useParticipantListFetchedAt()
   const apiCacheBustingQuery = useApiCacheBustingQuery()
+  const { latestLiveUpdate, liveUpdateStreamState } = useLiveUpdateStream()
   const isLoading = ref(false)
 
   const participants = computed(() => data.value?.payload ?? [])
@@ -39,9 +40,15 @@ export function useRecentParticipantList() {
     return fetchedAt.value === null || Date.now() - fetchedAt.value > DATA_POLLING_INTERVAL_MILLISECONDS
   }
 
-  // pages like the homepage already poll this list; only pages without it (or a stale copy) need an extra request
+  function isConfirmedCurrentByLiveUpdate(): boolean {
+    return latestLiveUpdate.value !== null
+      && liveUpdateStreamState.value === 'working'
+      && areDataVersionsCurrent(data.value?.dataVersions, latestLiveUpdate.value)
+  }
+
+  // pages like the homepage already keep this list current; only pages without it (or a stale copy) need an extra request
   async function ensureRecentParticipants() {
-    if (data.value && !isOlderThanPollingInterval()) return
+    if (data.value && (isConfirmedCurrentByLiveUpdate() || !isOlderThanPollingInterval())) return
 
     isLoading.value = true
     try {

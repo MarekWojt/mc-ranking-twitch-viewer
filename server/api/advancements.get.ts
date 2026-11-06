@@ -19,5 +19,10 @@ export default defineEventHandler(async (): Promise<ScoredDataWithFreshness<Adva
       mostRecentCompletedAtDisplay: formatAdvancementCompletedAt(mostRecentCompletedAt)
     }))
 
-  return { asOf: scoreboard.asOf, scoreGroupFactors: scoreboard.scoreGroupFactors, payload: advancements }
+  return {
+    asOf: scoreboard.asOf,
+    dataVersions: { scores: scoreboard.scoresVersion },
+    scoreGroupFactors: scoreboard.scoreGroupFactors,
+    payload: advancements
+  }
 })
